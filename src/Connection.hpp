@@ -19,6 +19,9 @@
   #include <afxsock.h>		// MFC socket extensions
   #include <WinSock.h>
   #include <process.h>    /* _beginthread, _endthread */
+  #include <io.h>
+  #include <fcntl.h> 
+
   #define socklen_t int
  #endif 
 #else
@@ -53,11 +56,13 @@ inline int Sleep(int ms)
 
 #include "Smart_commands.h"
 
+//cmd0 0xfe - запрос сервера, 0x22 - автоинформирование контроллера, 0x12 - переменная длина ответа - примерно
+
 struct Msg1
 {   short int cmd0; //команда
     short int cmd; //команда
     short int ind; //параметр
-    unsigned char Buf[120];
+    unsigned char Buf[128];
 };
 
 struct Msg2

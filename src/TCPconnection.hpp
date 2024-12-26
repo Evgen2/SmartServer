@@ -44,7 +44,7 @@ public:
    char IpTo[16];              //ip адрес удаленного сервера в char
    int timeout;                //таймаут на соединение в мс
    int timeoutAnswer;          //таймаут на повторение посылки в мс
-   int timeLastRW;
+   time_t timeLastRW;
    int nsend; // послано, раз
    int nresv; // получено, paз
    int nBsend; // байтов послано
@@ -58,6 +58,11 @@ public:
    int IdType; // id типа устройства
    int IdCode; // id устройства
    int IdNum;  // номер устройства
+   int Vers;
+   int Subvers;
+   int Subvers1;
+   char Mac[6];
+   char BiosDate[16]; //12 байт
 
    TCPconnection(void) //конструктор по умолчанию
    {  sock = sock0 = 0;
@@ -86,8 +91,10 @@ public:
    }
 //создать соединение
    int createTCPconnection(char _IpTo[], int port, int timeout, int timeoutAnswer, int verboze);
+
    int TCPconnect(int verboze);
    int reTCPconnect(void);
+   int createTCPserverconnection(int verboze);
    int createTCPserverconnection(int port, int timeout, int timeoutAnswer, int verboze);
 //закрыть соединение
    int closeConnection(void);
@@ -125,8 +132,8 @@ public:
 	int CommandHandle(int buflen);
 };
 
-int GetClock(void);
-int GetClockInit(void);
+clock_t GetClock(void);
+clock_t GetClockInit(void);
 int ShowMyIp(void);
 int InitTCPIP(void);
 

@@ -8,8 +8,7 @@ int InitTCPIP(void);
 void CloseTCPIP(void);
 
 int TCPconnection::InitClientConnection(int verboze)
-{   int i, l;
-    int rc;
+{   int l, rc;
    struct  Msg1 ucmd;
    struct  Msg1 outcmd;
 
@@ -19,7 +18,7 @@ int TCPconnection::InitClientConnection(int verboze)
     indcmd = (indcmd+1)&0xffff;
     ucmd.ind =  indcmd;
 	memcpy(ucmd.Buf, HAND_SHAKE_INP,l);
-	l += sizeof(short int)*3+1; //17
+	l += sizeof(short int)*3; //16
 
     rc = SendAndConfirm((char *)&ucmd, l, (char *)&outcmd, l, verboze);
 
@@ -45,31 +44,7 @@ int TCPconnection::InitClientConnection(int verboze)
 	l += sizeof(short int)*3+1; //17
     rc = SendAndConfirm((char *)&ucmd, l, (char *)&outcmd, l,  verboze);
     if(rc == 0)
-	{ // printf("Echo test Ok\n");
-		ucmd.cmd = MCMD_IDENTIFY;
-		ucmd.cmd0 = 0x12;
-		rc =  SendAndConfirm2((char *)&ucmd, 6, (char *)&outcmd, sizeof(outcmd), 6, 1,0x12);
-		if(rc == 0)
-		{  char str[512];
-		printf("\n");
-		   l = *((short int *)&outcmd.Buf[0]);
-		   IdType = *((int *)&outcmd.Buf[2]);
-		   IdCode = *((int *)&outcmd.Buf[6]);
-		   IdNum  = *((int *)&outcmd.Buf[10]);
-		   for(i=0; i<512; i++) str[i] = 1;
-           memcpy(str,(void *)&outcmd.Buf[14], l-sizeof(int)*2);
-//		   printf("test=%s\n",test);
-#ifdef _WIN32
-		rc = MultiByteToWideChar(CP_UTF8, 0,str,-1, IdName, 0);
-		rc = MultiByteToWideChar(CP_UTF8, 0,str,-1, IdName, 128);
-		   printf("IdTypt=%x IdCode=%x IdNum=%i\nIdName=%s \n",IdType,IdCode, IdNum, IdName);
-#else
-		   printf("IdTypt=%x IdCode=%x IdNum=%i\nIdName=%s \n",IdType,IdCode, IdNum, str); //todo
-#endif
-
-		   return 0;
-		}
-	    return 0x11;
+	{    return 0;
     }
 /*         */
         } else
@@ -81,13 +56,14 @@ int TCPconnection::InitClientConnection(int verboze)
     return -1;
 }
 
+int TCPconnection::createTCPserverconnection(int verboze)
+{	return createTCPserverconnection(port, timeout, timeoutAnswer, verboze);
+}
+
 //создать сервернон соединение с ip адресом _IpToб портом _port, таймаутами _timeout, _timeoutAnswer
 int TCPconnection::createTCPserverconnection(int _port, int _timeout, int _timeoutAnswer, int verboze)
 {   int rc;
     socklen_t n;
-#ifdef _WIN32
-    const unsigned int nonblocking = TRUE;
-#endif
     struct sockaddr_in client2;  //локальный порт на клиенте
 
     memset(&client,0,sizeof(sockaddr_in));
@@ -109,6 +85,154 @@ int TCPconnection::createTCPserverconnection(int _port, int _timeout, int _timeo
        printf("Ошибка создания сокета\n");
        return(1);
     }
+    
+	printf("sock0 %x\n", sock0);
+
+
+	n = sizeof(sockaddr_in);
+    rc = getsockname(sock0, (struct sockaddr *)&client2, &n);
+	if(verboze)
+		printf("Server port: %i (%x)\n", _port, _port);
+#ifdef _WIN32
+	{	int iResult; 
+		int iOptVal = 0;
+		int iOptLen = sizeof (int);
+		BOOL bOptVal = FALSE;
+		int bOptLen = sizeof (BOOL);
+		bOptVal = TRUE;
+#if 1		
+		iResult = getsockopt(sock0, SOL_SOCKET, SO_REUSEADDR, (char *) &iOptVal, &iOptLen);
+		if (iResult == SOCKET_ERROR) {
+			printf("getsockopt for SO_REUSEADDR failed with error: %u\n", WSAGetLastError());
+		} else {
+//			printf("SO_REUSEADDR Value: %ld\n", iOptVal);
+		}
+		iOptVal = 1;
+//		iResult = setsockopt(sock0, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, (char *) &iOptVal, sizeof (iOptVal));
+		iResult = setsockopt(sock0, SOL_SOCKET, SO_REUSEADDR, (char *) &iOptVal, sizeof(iOptVal));
+		if (iResult == SOCKET_ERROR) {
+	        printf("setsockopt for SO_REUSEADDR failed with error: %u\n", WSAGetLastError());
+	    } else {
+//			printf("Set SO_REUSEADDR: ON\n");
+		}
+
+		iResult = getsockopt(sock0, SOL_SOCKET, SO_REUSEADDR, (char *) &iOptVal, &iOptLen);
+		if (iResult == SOCKET_ERROR) {
+			printf("getsockopt for SO_REUSEADDR failed with error: %u\n", WSAGetLastError());
+		} else {
+//			printf("SO_REUSEADDR Value: %ld\n", iOptVal);
+		}
+#endif
+#if 0
+//SO_EXCLUSIVEADDRUSE
+		iResult = getsockopt(sock0, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, (char *) &iOptVal, &iOptLen);
+		if (iResult == SOCKET_ERROR) {
+			printf("getsockopt for SO_EXCLUSIVEADDRUSE failed with error: %u\n", WSAGetLastError());
+		} else {
+//			printf("SO_EXCLUSIVEADDRUSE Value: %ld\n", iOptVal);
+		}
+
+	    iOptVal = 1;
+		iResult = setsockopt(sock0, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, (char *) &iOptVal, sizeof (iOptVal));
+//		iOptVal = 1;
+//		iResult = setsockopt(sock0, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, (char *) &iOptVal, sizeof(iOptVal));
+		if (iResult == SOCKET_ERROR) {
+	        printf("setsockopt for SO_EXCLUSIVEADDRUSE failed with error: %u\n", WSAGetLastError());
+	    } else {
+//			printf("Set SO_EXCLUSIVEADDRUSE: ON\n");
+		}
+
+		iResult = getsockopt(sock0, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, (char *) &iOptVal, &iOptLen);
+		if (iResult == SOCKET_ERROR) {
+			printf("getsockopt for SO_EXCLUSIVEADDRUSE failed with error: %u\n", WSAGetLastError());
+		} else {
+//			printf("SO_EXCLUSIVEADDRUSE Value: %ld\n", iOptVal);
+		}
+
+#ifdef SO_REUSEPORT
+		iResult = getsockopt(sock0, SOL_SOCKET, SO_REUSEPORT, (char *) &iOptVal, &iOptLen);
+		if (iResult == SOCKET_ERROR) {
+		        printf("setsockopt for SO_REUSEADDR failed with error: %u\n", WSAGetLastError());
+//		else
+//			printf("SO_REUSEPORT: %ld\n", iOptVal);
+
+		iResult = setsockopt(sock0, SOL_SOCKET, SO_REUSEPORT, (char *) &bOptVal, bOptLen);
+		if (iResult == SOCKET_ERROR) {
+	        printf("setsockopt for SO_REUSEPORT failed with error: %u\n", WSAGetLastError());
+	    } else {
+//			printf("Set SO_REUSEPORT: ON\n");
+		}
+
+		iResult = getsockopt(sock0, SOL_SOCKET, SO_REUSEPORT, (char *) &iOptVal, &iOptLen);
+		if (iResult == SOCKET_ERROR) {
+		        printf("setsockopt for SO_REUSEADDR failed with error: %u\n", WSAGetLastError());
+//		else
+//			printf("SO_REUSEPORT: %ld\n", iOptVal);
+#endif
+#endif 
+
+	}
+#else
+	{	int iResult; 
+		int iOptVal = 0;
+		socklen_t iOptLen = sizeof (int);
+		int reuse = 1;
+		int bOptLen = sizeof (int);
+		
+		iResult = getsockopt(sock0, SOL_SOCKET, SO_REUSEADDR, (char *) &iOptVal, &iOptLen);
+		if (iResult == SOCKET_ERROR) {
+			 perror("getsockopt for SO_REUSEADDR failed with error");
+		} else {
+			printf("SO_REUSEADDR Value: %d\n", iOptVal);
+		}
+		iResult = setsockopt(sock0, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, bOptLen);
+		if (iResult == SOCKET_ERROR) {
+	        	 perror("setsockopt for SO_REUSEADDR failed with error:");
+		} else {
+//			printf("Set SO_REUSEADDR: ON\n");
+		}
+		iResult = getsockopt(sock0, SOL_SOCKET, SO_REUSEADDR, (char *) &iOptVal, &iOptLen);
+		if (iResult == SOCKET_ERROR) {
+			 perror("getsockopt for SO_REUSEADDR failed with error");
+//		} else {
+//			printf("SO_REUSEADDR Value: %d\n", iOptVal);
+		}
+
+#ifdef SO_REUSEPORT
+    	if (setsockopt(sock0, SOL_SOCKET, SO_REUSEPORT, (const char*)&reuse, sizeof(reuse)) < 0) 
+       			perror("setsockopt(SO_REUSEPORT) failed");
+//		else
+//			printf("Set SO_REUSEPORT: ON\n");
+		iResult = getsockopt(sock0, SOL_SOCKET, SO_REUSEPORT, (char *) &iOptVal, &iOptLen);
+		if (iResult == SOCKET_ERROR) {
+			 perror("getsockopt for SO_REUSEPORT failed with error:");
+		} else {
+//			printf("SO_REUSEPORT Value: %d\n", iOptVal);
+		}
+	}
+#endif
+#endif // WIN32
+
+/* nonblocking mode */
+#ifdef _WIN32
+    const unsigned int nonblocking = TRUE;
+    rc = ioctlsocket(sock0, FIONBIO, (u_long *)&nonblocking);
+    if (rc < 0)
+    {  if(verboze)
+			printf("Ошибка вызова ioctl error = %d\n", WSAGetLastError() );
+       closesocket(sock0);
+		   sock0 = -1;
+       return(3);
+    }
+#else
+    rc = fcntl(sock0, F_SETFL, O_NONBLOCK);
+    if(rc == -1)
+    {   perror("fcntl");
+       closesocket(sock0);
+		   sock0 = -1;
+       return(3);
+    }
+#endif // WIN32
 
     rc = bind(sock0, (struct sockaddr *)&server, sizeof(sockaddr_in));
     if(rc == -1)
@@ -123,28 +247,6 @@ int TCPconnection::createTCPserverconnection(int _port, int _timeout, int _timeo
        return(2);
     }
 
-    n = sizeof(sockaddr_in);
-    rc = getsockname(sock0, (struct sockaddr *)&client2, &n);
-	if(verboze)
-		printf("Server port: %i (%x)\n", _port, _port);
-#if 0
-/* nonblocking mode */
-#ifdef _WIN32
-    rc = ioctlsocket(sock, FIONBIO, (u_long *)&nonblocking);
-    if (rc < 0)
-    {  printf("Ошибка вызова ioctl error = %d\n", WSAGetLastError() );
-       closesocket(sock);
-       return(3);
-    }
-#else
-    rc = fcntl(sock, F_SETFL, O_NONBLOCK);
-    if(rc == -1)
-    {   perror("fcntl");
-       closesocket(sock);
-       return(3);
-    }
-#endif // WIN32
-#endif //0
     port = _port;
     timeout = _timeout;
     timeoutAnswer = _timeoutAnswer;
@@ -152,17 +254,27 @@ int TCPconnection::createTCPserverconnection(int _port, int _timeout, int _timeo
 }
 
 int TCPconnection::closeConnection(void)
-{ if(sock > 0)
-       closesocket(sock);
+{ 
+#ifdef _WIN32
+#endif 
+	if(sock > 0)
+    { 	printf("closeConnection sock %x\n", sock);
+		closesocket(sock); 
+    }
    sock = -1;
+   if(sock0 > 0)
+   { 	printf("closeConnection sock0 %x\n", sock0);
+       closesocket(sock0);
+   }
+   sock0 = -1;
    return 0;
 }
 
 int TCPconnection::TCPconnect(int verboze)
 { int rc;
-    timeval Timeout;
-    Timeout.tv_sec = timeout/1000;
-    Timeout.tv_usec = (timeout - timeout/1000*1000)*1000 ;
+    timeval Timeout_us;
+    Timeout_us.tv_sec = timeout/1000;
+    Timeout_us.tv_usec = (timeout - timeout/1000*1000)*1000 ;
 
     sock = socket( AF_INET, SOCK_STREAM,  IPPROTO_TCP /* IPPROTO_UDP */ ); //создаем сокет
     if(sock == -1)
@@ -182,7 +294,7 @@ int TCPconnection::TCPconnect(int verboze)
     rc = ioctlsocket(sock, FIONBIO, (u_long *)&nonblocking);
     if (rc < 0)
     {  if(verboze)
-			printf("Ошибка вызова ioctl error = %d\n", WSAGetLastError() );
+			printf("Error call ioctl error = %d\n", WSAGetLastError() );
        closesocket(sock);
 		   sock = -1;
        return(3);
@@ -238,7 +350,7 @@ int TCPconnection::TCPconnect(int verboze)
     FD_SET(sock, &Err);
  
     // check if the socket is ready
-    rc = select(0,NULL,&Write,&Err,&Timeout);			
+    rc = select(0,NULL,&Write,&Err,&Timeout_us);			
   if (rc==(-1))
   {  
 #ifdef _WIN32
@@ -287,9 +399,9 @@ int TCPconnection::TCPconnect(int verboze)
 int TCPconnection::createTCPconnection(char _IpTo[], int _port, int _timeout, int _timeoutAnswer, int verboze)
 {   int rc;
     socklen_t n;
-    timeval Timeout;
-    Timeout.tv_sec = _timeout/1000;
-    Timeout.tv_usec = (_timeout - _timeout/1000*1000)*1000 ;
+    timeval Timeout_us;
+    Timeout_us.tv_sec = _timeout/1000;
+    Timeout_us.tv_usec = (_timeout - _timeout/1000*1000)*1000 ;
 
 #ifdef _WIN32
     const unsigned int nonblocking = TRUE;
@@ -382,7 +494,7 @@ int TCPconnection::createTCPconnection(char _IpTo[], int _port, int _timeout, in
     FD_SET(sock, &Err);
  
     // check if the socket is ready
-    rc = select(0,NULL,&Write,&Err,&Timeout);			
+    rc = select(0,NULL,&Write,&Err,&Timeout_us);			
   if (rc==(-1))
   {  
 #ifdef _WIN32
@@ -619,20 +731,20 @@ M0:
           ierr = 0;
 { int sockList[2], timeout_ms=5000, num=0;
   fd_set fds;
-  struct timeval timeout;
+  struct timeval timeout_us;
 
    FD_ZERO(&fds);
    FD_SET(sock, &fds);
   sockList[0] = sock;
-  timeout.tv_sec = timeoutAnswer/1000;
+  timeout_us.tv_sec = timeoutAnswer/1000;
   timeout_ms = (timeoutAnswer - timeoutAnswer/1000*1000)*1000;
   if(lenout > 60)
   {  timeout_ms = 8000;
      if(lenout > 120)
          timeout_ms = 16000;
   }
-  timeout.tv_usec = timeout_ms;
-  num = select(sizeof(fds)*8, &fds, NULL, NULL, &timeout);
+  timeout_us.tv_usec = timeout_ms;
+  num = select(sizeof(fds)*8, &fds, NULL, NULL, &timeout_us);
       if(num == SOCKET_ERROR)
       {
 #ifdef _WIN32
@@ -703,14 +815,14 @@ M0:
 							i = lenout;
 						memcpy(bufout,buff_out,i);
 						if(verboze) 
-						{ printf("\a\nКоманда %d (0x%x) неизвестна контроллеру\n", pm2->cmd, pm2->cmd);
+						{ printf("\a\nCMD %d (0x%x) unknown to controller\n", pm2->cmd, pm2->cmd);
 						}
 						return 6;
 					}
 				}
 			   
 			   if(nb != lenout) 
-               {  printf("\a\nПолучено: %i байт != %i, cmdR=%i S=%i rS=%i<\n",
+               {  printf("\a\nGet: %i bytes  != %i, cmdR=%i S=%i rS=%i<\n",
                     nb, lenout, pm2->cmd, pm1->cmd, razSendold);
                  stat[5]++;
                  rc0 = 5;
@@ -753,6 +865,13 @@ M0:
 
 
 //послать буфер с подтверждением с переменной длиной ответа
+//FirstByte - первый байт в данных ответа должен равняться FirstByte
+//size0 - размер в байтах одного элемента ответа
+//shiftLansw - смещение в байтах от начала ответа длины ответа в элементах (short int)
+//             la = (int) *((short int *) &buff_out[shiftLansw]); - длина ответа в элеменатх
+//             la * size0 + shiftLansw + 2; - общая длина ответа
+// пример:	rc =  SendAndConfirm2((char *)&ucmd, 6, (char *)&outcmd, sizeof(outcmd), 6, 1,0x12);
+//смещение 6, элементы по 1 байту, первый байт должен быть 0x12
 //rc = 0 Ok
 //rc = 1 Timeout
 //rc = 2 прочие ошибки
@@ -842,18 +961,18 @@ int TCPconnection::SendAndConfirm2(char bufin[], int len, char bufout[], int len
           ierr = 0;
 { int  timeout_ms=5000, num=0;
   fd_set fds;
-  struct timeval timeout;
+  struct timeval timeout_us;
 
    FD_ZERO(&fds);
    FD_SET(sock, &fds);
-  timeout.tv_sec = 0;
+  timeout_us.tv_sec = 0;
   if(lenout > 60)
   {  timeout_ms = 8000;
      if(lenout > 120)
          timeout_ms = 16000;
   }
-  timeout.tv_usec = timeout_ms;
-  num = select(sizeof(fds)*8, &fds, NULL, NULL, &timeout);
+  timeout_us.tv_usec = timeout_ms;
+  num = select(sizeof(fds)*8, &fds, NULL, NULL, &timeout_us);
 
       if(num == SOCKET_ERROR)
       {
@@ -941,7 +1060,7 @@ int TCPconnection::SendAndConfirm2(char bufin[], int len, char bufout[], int len
 
 //               if(la != nb)
 //               {
-                  printf("\a\n2Получено: %i байт != %i\n",nb, la);
+                  printf("\a\n2Get: %i байт != %i\n",nb, la);
                  stat[5]++;
                  rc0 = 5;
                  isTimeout2 = 0;
@@ -998,20 +1117,26 @@ int TCPconnection::Read(char bufin[], int len)
    return rc;
 }
 
+//return 
+//rc >= 0  -number of bytes read from socket
+//rc = -2 select   socker error
+//rc = -3 recvfrom socker error
+//rc = -4 recvfrom error
+//
 int TCPconnection::Read(char bufin[], int len, int timeout_ms)
 {  int rc = 0, i;
    int sockList[2],  num=0;
    fd_set fds;
-  struct timeval timeout;
+  struct timeval timeout_us;
    unsigned char buff_out[1500];
    socklen_t addr_len;
 
    FD_ZERO(&fds);
    FD_SET(sock, &fds);
    sockList[0] = sock;
-   timeout.tv_sec = 0;
-   timeout.tv_usec = timeout_ms*1000;
-   num = select(FD_SETSIZE, &fds, NULL, NULL, &timeout);
+   timeout_us.tv_sec = 0;
+   timeout_us.tv_usec = timeout_ms*1000;
+   num = select(FD_SETSIZE, &fds, NULL, NULL, &timeout_us);
    if(num == SOCKET_ERROR)
    {
 #ifdef _WIN32
@@ -1040,14 +1165,30 @@ int TCPconnection::Read(char bufin[], int len, int timeout_ms)
 #endif //_WIN32
 			  return -3;
 	     }
-         printf("recv rc= %d\n", rc);
+//         printf("recv rc= %d\n", rc);
 		 return -4;
+	} else if(rc == 0) {
+		;
+/*         printf("select rc %d recvfrom rc %d\n", num, rc);
+
+		{  char str[20];
+inet_ntop(AF_INET, &(client.sin_addr), str, INET_ADDRSTRLEN);
+
+printf("CLIENT  %s\n",  str);
+		}
+*/
+	}  else {
+//         printf("1select rc %d recvfrom rc %d\n", num, rc);
+		 timeLastRW = time(NULL);
+		if(rc < len)
+			len = rc;
+		for(i=0; i< len; i++)
+		{   bufin[i] = buff_out[i];
+		}
+
 	}
 
-	for(i=0; i<rc; i++)
-	{   bufin[i] = buff_out[i];
-	}
-    return rc;
+	return rc;
 }
 
 
@@ -1064,6 +1205,10 @@ int TCPconnection::Send(char buf[], int len)
 #endif // _WIN32
          return -1;
     }
+
+	if(rc > 0)
+		timeLastRW = time(NULL);
+
 	return rc;
 }
 
@@ -1082,6 +1227,7 @@ int InitTCPIP(void)
 #else
 	;
 #endif
+	ShowMyIp();
     GetClockInit();
 	return 0;
 }
@@ -1097,17 +1243,19 @@ void CloseTCPIP(void)
 #endif //_WIN32
 }
 
+
 #ifdef _WIN32
 
-static int d_time;
-static int d_time_start;
+static clock_t d_time;
+static clock_t d_time_start;
+//typedef long clock_t;
 
-int GetClockInit(void)
+clock_t GetClockInit(void)
 { d_time_start = clock();
   return d_time_start; 
 }
 
-int GetClock(void)
+clock_t GetClock(void)
 {  d_time = clock();
    return  d_time -  d_time_start; 
 }
@@ -1117,18 +1265,18 @@ int GetClock(void)
 static double d_time;
 static double d_time_start;
 
-int GetClockInit(void)
+clock_t GetClockInit(void)
 { struct timespec time;
    clock_gettime(CLOCK_MONOTONIC,&time);
    d_time_start = ((double)time.tv_sec + 1.0e-9 * time.tv_nsec);
-   return 0;
+   return (clock_t)0;
 }
 
-int GetClock(void)
+clock_t GetClock(void)
 {   struct timespec time;
      clock_gettime(CLOCK_MONOTONIC,&time);
      d_time = ((double)time.tv_sec + 1.0e-9 * time.tv_nsec);
-	 return (int)((d_time - d_time_start) * 1000);
+	 return (clock_t)((d_time - d_time_start) * 1000);
 }
 
 #endif

@@ -75,11 +75,19 @@ int AutoConfig::AddC(const char *_format, ...)
 	return 0;
 }
 int AutoConfig::WriteN(FILE *fp, int id)
-{	void *p[8];
+{	void *p[MAX_FORMAT_ITEMS];
 	void * *ppp;
+	int rc=0, i, n;
 	if(it[id].np == 0)
 		return 1;
+	n = it[id].np;
+	if(it[id].np > MAX_FORMAT_ITEMS)
+	{	rc = 2;
+		n = MAX_FORMAT_ITEMS;
+	}
+
 	ppp = it[id].pptr;
+
 	switch(it[id].np)
 	{	case 1:
 		{	p[0] = *ppp;
@@ -99,9 +107,17 @@ int AutoConfig::WriteN(FILE *fp, int id)
 			fprintf(fp,it[id].format, p[0], p[1], p[2]);
 		}
 		break;
+		case 4:
+		{	p[0] = *ppp++;
+			p[1] = *ppp++;
+			p[2] = *ppp++;
+			p[3] = *ppp;
+			fprintf(fp,it[id].format, p[0], p[1], p[2], p[3]);
+		}
+		break;
 	}
 
-	return 0;
+	return rc;
 }
 
 int AutoConfig::Write(char *fname)
@@ -269,4 +285,58 @@ M: pstr= fgets(str,128,fp);
    strcpy(par,pstr);      // читаем параметры
    sscanf(str,"%s",name);
    return 0;
+}
+
+int AutoConfig::AnalizeRecodrRead(char *name, char *par)
+{  int i, rc,  is=0,npar=0;
+   double dp;
+   char str[256];
+  for(i=0; i < n; i++)
+  {	if(it[i].type == _COMMENT) continue;
+  	if(it[i].type == _NUL) continue;
+	if(it[i].name == NULL) continue;
+    if(!strcmp(name,it[i].name))
+      {  is = 1;
+         npar = i;
+         break;
+      }
+  }
+
+  if(!is) return 1;
+  switch(it[npar].type)
+  {	case _INT:
+		{  rc = sscanf(par,"%i", &i);
+			if(rc == 1)
+			{	*((int *)it[npar].ptr) = i;
+			}
+		 }
+
+		break;
+  	case _DOUBLE:
+		 {  rc = sscanf(par,"%lf", &dp);
+			if(rc == 1)
+			{		*((double *)it[npar].ptr) = dp;
+			}
+		 }
+
+		break;
+  	case _STR:
+		 {  rc = sscanf(par,"%s", str);
+			if(rc == 1)
+			{	if(it[npar].ptr)
+				{	strncpy((char *)it[npar].ptr, str, it[npar].nb);
+				} else {
+					printf("it[%d].ptr==NULL\n",npar);
+					exit(1);
+				}
+			}
+		 }
+
+		break;
+	default:
+		printf("Unknown type %d\n",it[npar].type);
+		exit(1);
+  }
+
+  return 0;
 }

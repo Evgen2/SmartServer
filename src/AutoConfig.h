@@ -17,8 +17,11 @@
 //#define	__time32_t	time32_t 
 //#define	__time64_t	time64_t 
 //extern char* strdup (const char* s);
+typedef unsigned char byte;
+
 #endif
 
+#define MAX_FORMAT_ITEMS 4
 #define MAX_N_ITEMS 256
 enum Mytpes
 {	_NUL,
