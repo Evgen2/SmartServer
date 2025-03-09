@@ -2,19 +2,15 @@
 #ifndef SMART_CONFIG
 #define SMART_CONFIG
 
-#define APPLICATION_NAME1 L"SmartTherm server"
-#define APPLICATION_NAME2  "SmartTherm server"
 #define APPLICATION_NAME "ST server"
 #define DEBUG_LEVEL 6
 
-//#define VERSION "0.00.00"
-//#define SUBVERSION "1"
 #define CONFIG_VERSION 1
 
 #define SERVER_CODE   	   25
 #define SERVER_VERSION     0
 #define SERVER_SUBVERSION  0
-#define SERVER_SUBVERSION1 1
+#define SERVER_SUBVERSION1 3
 
 #define IDENTIFY_TYPE	DS_SMARTSERVER
 #define IDENTIFY_TEXT   APPLICATION_NAME

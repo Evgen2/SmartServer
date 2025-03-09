@@ -122,7 +122,12 @@ int SmartTerm::callback_Get_Sts(struct Msg1 *in, int inb, struct Msg1 *out, int 
 
 	memcpy((void *)&FlameModulation,	(void *)&in->Buf[42], 4);
 	memcpy((void *)&Pressure,	(void *)&in->Buf[46], 4);
-	memcpy((void *)&stsDS,		(void *)&in->Buf[50], 4);
+	{	unsigned short int tmp2;
+		memcpy((void *)&tmp2,		(void *)&in->Buf[50], 2);
+		stsDS = tmp2;
+		memcpy((void *)&tmp2,		(void *)&in->Buf[52], 2);
+		lOTlog = tmp2;
+	}
 	memcpy((void *)&t1,			(void *)&in->Buf[54], 4);
 	memcpy((void *)&t2,			(void *)&in->Buf[58], 4);
 	memcpy((void *)&Toutside,	(void *)&in->Buf[62], 4);
@@ -131,10 +136,8 @@ int SmartTerm::callback_Get_Sts(struct Msg1 *in, int inb, struct Msg1 *out, int 
 	memcpy((void *)&TroomTarget,(void *)&in->Buf[74], 4);
 	if(inb >= 92)
 	{	if(StartSts == 0)
-		{
-			memcpy((void *)&InT,		(void *)&in->Buf[78], 4);
+		{	memcpy((void *)&InT,		(void *)&in->Buf[78], 4);
 			memcpy((void *)&U0,			(void *)&in->Buf[82], 4);
-//			printf("==>InT %f, U0 %f", InT, U0);
 		}
 	}
 
@@ -143,14 +146,46 @@ int SmartTerm::callback_Get_Sts(struct Msg1 *in, int inb, struct Msg1 *out, int 
 	return rc;
 }
 
+//CCMD_SEND_OTLOG_S
+int SmartTerm::callback_Send_OTlog(struct Msg1 *in, int inb, struct Msg1 *out, int &outb)
+{	int rc = 0, rc1=0,  l, ln;
+	unsigned short int nel, tmp2;
+	out->cmd = SCMD_SEND_OTLOG_C;
+	outb = 8;
+
+	memcpy((void *)&nel,(void *)&in->Buf[4], 2);
+	ln = (nel & 0xff);//элементов лога в пакете данных
+	l =  ln * 8 + 6+6;
+	if(l != inb)
+	{	//printf("callback_Send_OTlog l=%d, inb = %d\n", l, inb);
+		return 0;
+	}	else	{	
+		rc1 = OTlog.Add_OT_log((void *)&in->Buf[6], ln );
+	}
+
+	l = (nel>>8); //всего элементов лога, если 255, то может быть и больше. Ѕыло до отправки пакета. ѕосле отправки - меньше на ln
+	if(l > ln && rc1 == 0)
+	{ tmp2 = l - ln;
+		memcpy(&out->Buf[0], &tmp2,2);
+//		printf("get me %d\n", tmp2);
+	  rc = 1;
+	} else {
+	  tmp2 = 0;
+		memcpy(&out->Buf[0], &tmp2,2);
+	}
+
+//todo
+	return rc;
+}
 
 //CCMD_SEND_STS_S answer
 int SmartTerm::callback_Send_Sts(struct Msg1 *in, int inb, struct Msg1 *out, int &outb)
-{	int rc = 0, tmp;
+{	int rc = 0, tmp=0;
     short int nonclose_connect;
 	short int remote_cmd;
 	time_t tnow;
 	static int raz = 0;
+
 	tnow = time(NULL);
 	callback_Get_Sts(in, inb, NULL, tmp);
 	out->cmd = CCMD_SEND_STS_S;
@@ -168,12 +203,34 @@ int SmartTerm::callback_Send_Sts(struct Msg1 *in, int inb, struct Msg1 *out, int
 			remote_cmd = 1;
 	else if(isCmd == 0x10)
 			remote_cmd = 0x10;
+	else 
+	{
+		if(OTlog.lOTlog == 0 && lOTlog > 0) OTlog.InitLog(lOTlog);
+		if(OTlog.lOTlog > 0)
+		{	tmp = OTlog.cmdLog(lOTlog);
+			if(tmp > 0)
+			{	remote_cmd = 0x02;
+			} else {
+				char dirname[80];
+				sprintf(dirname,"st_%d", ClientId);
+				OTlog.writeLog(dirname);
+				OTlog.FinishLog();
+				if(OTlog.memberCode >= 0)
+				{	OTmemberCode = OTlog.memberCode;
+					parent->need_save_smt = 1;
+				}
+			}
+		}
+
+//		if(lOTlog > 0)
+//			remote_cmd = 0x02;
+	}
 	memcpy(&out->Buf[4], &remote_cmd,2);
 	switch(remote_cmd)
-	{	case 0:
+	{	case 0: // подтверждение + ReportPeriod
 			outb = 6+4+2;
 			break;
-		case 1:
+		case 1: // подтверждение + ReportPeriod + задать параметры
 			memcpy(&out->Buf[6], &B_flags_toSet,2);
 			memcpy(&out->Buf[8], &Tset_toSet,4);
 			memcpy(&out->Buf[12], &TroomTarget_toSet,4);
@@ -181,7 +238,17 @@ int SmartTerm::callback_Send_Sts(struct Msg1 *in, int inb, struct Msg1 *out, int
 			isCmd = 2;
 			outb = 6+4*4+2*2;
 			break;
-		case 0x10:
+
+		case 2: //cmd to send CCMD_SEND_OTLOG_S
+//			tmp = lOTlog;
+//			if(tmp > 15) tmp = 15;
+			memcpy(&out->Buf[6], &tmp,4);
+			outb = 6+4*2+2;
+			isCmd = 0;
+			rc = 1;
+			break;
+
+		case 0x10: //подтверждение + начальные значени€ PID после рестарта
 			memcpy(&out->Buf[6], &InT,4);
 			memcpy(&out->Buf[10], &U0,4);
 			StartSts = 0;
@@ -280,12 +347,14 @@ M: pstr= fgets(str,128,fp);
 
 int SmartTerm::write(FILE *fp)
 {
-		fprintf(fp,"smt.MAC=%02x:%02x:%02x:%02x:%02x:%02x\n",mac[0], mac[1], mac[2], mac[3], mac[4],mac[5] );
-		fprintf(fp,"smt.type=%d\n",type);
-		fprintf(fp,"smt.ipaddr=%s\n",ipaddr);
-		fprintf(fp,"smt.ClientId=%x\n",ClientId);
+		fprintf(fp,"smt.MAC=%02x:%02x:%02x:%02x:%02x:%02x\n", mac[0], mac[1], mac[2], mac[3], mac[4],mac[5] );
+		fprintf(fp,"smt.type=%d\n", type);
+		fprintf(fp,"smt.st_type=%d\n", st_type);
+		fprintf(fp,"smt.version=%d.%d.%d\n", Vers, SubVers, SubVers1);
+		fprintf(fp,"smt.ipaddr=%s\n", ipaddr);
+		fprintf(fp,"smt.OTmemberCode=%d\n", OTmemberCode);
+		fprintf(fp,"smt.ClientId=%x\n", ClientId);
 		fprintf(fp,"smt.ClientId_k=%x\n", ClientId_k);
-		
 		
 		return 0;
 }
@@ -295,6 +364,7 @@ int SmartTerm::AnalizeRecodrRead(char *name, char *par)
 
 static const char *lprgsNames[]=
 { "MAC",  "type", "ipaddr", "ClientId", "ClientId_k",
+  "OTmemberCode", "version","st_type",
   NULL
 };
 
@@ -345,16 +415,39 @@ static const char *lprgsNames[]=
 			ClientId_k = tmp;
       }  
        break;
+
+	 case 5: /* OTmemberCode */
+      { int tmp;
+        rc = sscanf(par,"%d",&tmp);
+		if(rc > 0)
+			OTmemberCode = tmp;
+      }  
+
+       break;
+
+	 case 6: /* version */
+		{	int v, sv, sv1;
+	        rc = sscanf(par,"%d.%d.%d",&v, &sv, &sv1);
+			if(rc == 3)
+			{	Vers = v;
+				SubVers = sv;
+				SubVers1 = sv1;
+			}
+		}
+       break;
+
+     case 7:  /* st_type */
+      { int tmp;
+        rc = sscanf(par,"%d",&tmp);
+		if(rc > 0)
+			st_type = tmp;
+      }  
+       break;
   }
 
   return 0;
 }
 
-
-int SmartTerm::read(FILE *fp)
-{	int rc;
-	return 0;
-}
 
 int SmartApp::loop1( struct Msg1 *out, int &outb)
 {	
@@ -427,7 +520,7 @@ int SmartApp::callback_get_sts(struct Msg1 *in, int inb, struct Msg1 *out, int &
 #endif
 	memcpy((void *)&out->Buf[76], (void *)&tt32,	4);
 
-/* два раз провер€ем, установилась ли уставка, потом сбрасываем признак наличи€ команды. „тобы из веб интрефейса и HA можно было задать новую уставку */
+/* два раза провер€ем, установилась ли уставка, потом сбрасываем признак наличи€ команды. „тобы из веб интрефейса и HA можно было задать новую уставку */
 	if(pSmt->isCmd == 2)
 	{	if(pSmt->TroomTarget != pSmt->TroomTarget_toSet || pSmt->TdhwSet != pSmt->TdhwSet_toSet) 
 			pSmt->isCmd  = 1;
@@ -458,16 +551,17 @@ int SmartApp::callback_set_state(struct Msg1 *in, int inb, struct Msg1 *out, int
 		return -1;
 	outb = 6;	
 	memcpy((void *)out,(void *)in,6); // out->cmd = ACMD_SET_STATE_S
-printf("** ACMD_SET_STATE_S\n");
+	
+	Log(10, "** ACMD_SET_STATE_S\n");
 
 	memcpy((void *)&pSmt->B_flags_toSet,(void *)&in->Buf[4], 2);
-printf("pSmt->B_flags_toSet = %d\n", ((unsigned int)pSmt->B_flags_toSet));
+ Log(10, "pSmt->B_flags_toSet = %x\n", ((unsigned int)pSmt->B_flags_toSet));
 	memcpy((void *)&pSmt->Tset_toSet,(void *)&in->Buf[6], 4);
-printf("pSmt->Tset_toSet = %f\n", pSmt->Tset_toSet);
+ Log(10, "pSmt->Tset_toSet = %f\n", pSmt->Tset_toSet);
 	memcpy((void *)&pSmt->TroomTarget_toSet,(void *)&in->Buf[10], 4);
-printf("pSmt->TroomTarget_toSet = %f\n", pSmt->TroomTarget_toSet);
+ Log(10, "pSmt->TroomTarget_toSet = %f\n", pSmt->TroomTarget_toSet);
 	memcpy((void *)&pSmt->TdhwSet_toSet,(void *)&in->Buf[14], 4);
-printf("pSmt->TdhwSet_toSet = %f\n", pSmt->TdhwSet_toSet);
+ Log(10, "pSmt->TdhwSet_toSet = %f\n", pSmt->TdhwSet_toSet);
 	pSmt->isCmd = 1;
 
 	return 0;

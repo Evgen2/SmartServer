@@ -74,47 +74,6 @@ struct Msg2
 
 #endif // MSG1MSG2
 
-class Connection1
-{
-public:
-   int type;
-   struct sockaddr_in server;  //адрес  сервера
-   struct sockaddr_in client;  //адрес  клиента
-   int timeout;                //таймаут на соединение в мс
-   int timeoutAnswer;          //таймаут на повторение посылки в мс
-   int ierr;  // код ошибки, если есть
-
-   wchar_t IdName[128]; //Название устройства
-   int IdCode; // id устройства
-   int IdNum;  // номер устройства
-
-   Connection1(void) //конструктор по умолчанию
-   {  type = 0;
-      ierr = 0;
-      IdName[0] = 0; //Название устройства
-      IdCode = 0; // id устройства
-      IdNum = 0;  // номер устройства
-   }
-   ~Connection1(void) //деструктор
-   { //if(sock > 0)
-     //       soclose(sock);
-   }
-/*
-//послать буфер с подтверждением
-   int SendAndConfirm(char buf[], int len, char bufout[], int lenout);
-//послать буфер с подтверждением с переменной длиной ответа
-   int SendAndConfirm2(char buf[], int len, char bufout[], int lenout, int shiftLansw, int size0, int FirstByte);
-//запрос информации
-   int GetInfo(void);
-//читать
-   int Read(char bufin[], int len);
-//читать
-   int Read(char bufin[], int len, int timeout);
-//послать
-   int Send(char buf[], int len);
-*/
-
-};
 
 #endif
 //CONNECTION_DEF

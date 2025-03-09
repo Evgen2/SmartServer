@@ -8,6 +8,7 @@ int SmartClient::loop(void)
 	rc0 = TcpRead();
 	if(rc0 > 0)
 	{	sts_cl = 3;
+//printf("TcpRead %d\n", rc0);
 		rc1 = ParseFromTCP( rc0,  lsend, needclose);
 		if(rc1 == 0 && lsend > 0)
 		{	rc0 = tcpClient.Send(WriteBuff, lsend);
@@ -35,6 +36,8 @@ int SmartClient::loop(void)
 		Log(9, "Close client on TcpRead2 rc %d\n", rc0);
 		rc = 1;
 	}
+//	if(rc != 0)
+//		printf("loop rc =%d\n", rc);
 	if(rc == 0)
 		Sleep(20);
 	else
@@ -83,7 +86,6 @@ int SmartClient::ParseFromTCP(int nb, int &Lsend, int &needclose)
 
 	if(smartd!= NULL)
 		smartd->tlastc = time(NULL);
-//	printf("cmd = %x (%d)\n", cmd, cmd);
 
 	switch(cmd)
 	{
@@ -184,11 +186,47 @@ int SmartClient::ParseFromTCP(int nb, int &Lsend, int &needclose)
 			rc = st->callback_Send_Sts(pucmd, nb, &MsgOut, Lsend);
 	   Log(10, "ParseFromTCP CCMD_SEND_STS rc =%d nb = %d Lsend=%d\n", rc, nb, Lsend);
 			if(rc)
-			{	st->sts = STS_ERROR; //todo
+			{	st->sts = STS_REPORT_ANSWER; //todo
+			needclose = 0;
 			} else {
 				st->sts = STS_REPORT_ANSWER;
-			}
 			needclose = 1;
+			}
+		}
+			break;
+
+		case  CCMD_SEND_OTLOG_S:
+		{	SmartTerm *st;
+			st = (SmartTerm *)smartd; 
+			if(st == NULL)
+			{	if(callback_ClientID_from_Get_Sts(pucmd, nb))
+				{	if(smartd->type == 1)
+					{	devsts = 1;
+						st = (SmartTerm *)smartd; 
+					} else {
+					   Log(2, "Error : smartd->type %d != 1\n", smartd->type);
+					   break;
+					}
+
+					OnIdentify();
+				} else {
+					ask_HandShake( &MsgOut, Lsend);
+					break;
+				}
+			}
+			if(st != NULL) 
+				st->tlastc = time(NULL);
+	   Log(10, "ParseFromTCP CCMD_SEND_OTLOG_S\n");
+
+			rc = st->callback_Send_OTlog(pucmd, nb, &MsgOut, Lsend);
+	   Log(10, "ParseFromTCP CCMD_SEND_OTLOG_S rc =%d nb = %d Lsend=%d\n", rc, nb, Lsend);
+			if(rc)
+			{	st->sts = STS_REPORT_ANSWER; //todo
+				needclose = 0;
+			} else {
+				st->sts = STS_REPORT_ANSWER;
+				needclose = 1;
+			}
 		}
 			break;
 
@@ -268,6 +306,7 @@ int SmartClient::ParseFromTCP(int nb, int &Lsend, int &needclose)
 			needclose = 1;
 		}
 			break;
+
 
 		default:
  		Log(1,"Unknown cmd %i (%x) in %s\n", cmd, cmd, __FUNCTION__);
@@ -362,7 +401,7 @@ extern int FindSmartTherm(unsigned char mac[6]);
 extern int FindSmartThermId(int _id);
 extern int FindSmartAppId(int _id);
 
-extern SmartDevice_stub *AddSmartTherm(unsigned char mac[6], char *_ipaddr);
+extern SmartDevice_stub *AddSmartTherm(unsigned char mac[6], char *_ipaddr, int st_type);
 extern SmartDevice_stub *GetSmartDev(int _ind, int idclient, char *_ipaddr, int mode);
 
 extern int FindSmartApp(unsigned char mac[6]);
@@ -376,8 +415,9 @@ extern SmartDevice_stub *AddSmartApp(unsigned char mac[6], char *_ipaddr,  int i
 //     1 - new dev
 //     2 - new app
 int  SmartClient::callback_Introduce(struct Msg1 *in, int inb, struct Msg1 *out, int &outb) 
-{	int l, rc = -1,  ind, id, oldv=0;
-	int idtype, idcode, idNumber, vers, subvers, subvers1;
+{	int l, rc = -1,  ind, id, oldv=0, ischange;
+	int idcode, idNumber, vers, subvers, subvers1;
+	unsigned short int idtype, idsubtype;
 	short int ld;
 	char _biosDate[12];     /* дата компиляции биоса */
 	unsigned char mac[6];    
@@ -391,7 +431,9 @@ int  SmartClient::callback_Introduce(struct Msg1 *in, int inb, struct Msg1 *out,
 	Log(10, "Get MCMD_INTRODUCESELF\n");
     ld = *((short int *)&in->Buf[0]);
 
-	idtype = *((int *)&in->Buf[2]);
+	idtype    = *((unsigned short int *)&in->Buf[2]);
+	idsubtype = *((unsigned short int *)&in->Buf[4]);
+
 	idcode = *((int *)&in->Buf[6]);
 	idNumber = *((int *)&in->Buf[10]);
 	vers     = *((int *)&in->Buf[14]);
@@ -434,7 +476,7 @@ int  SmartClient::callback_Introduce(struct Msg1 *in, int inb, struct Msg1 *out,
 		{	ind = FindSmartTherm(mac);
 			if(ind < 0)
 			{ // printf("Новый контроллер\n"); 
-			   smartd = AddSmartTherm(mac, ipaddr);
+			   smartd = AddSmartTherm(mac, ipaddr, idsubtype);
 			   if(smartd == NULL)
 			   { 	printf("Предел по числу контроллеров \n");
 					rc = -1;
@@ -446,13 +488,22 @@ int  SmartClient::callback_Introduce(struct Msg1 *in, int inb, struct Msg1 *out,
 				   rc = 1;
 				}
 			} else {
-//			  printf("контроллер ind %d\n", ind); 
+				ischange = 0;
+//			  printf("контроллер ind %d\n", ind);
 				smartd = GetSmartDev(ind, idclient, ipaddr,1);
+				if(vers != smartd->Vers) ischange++;
 				smartd->Vers = vers;
+				if(subvers != smartd->SubVers) ischange++;
 				smartd->SubVers = subvers;
-				smartd->SubVers1= subvers1;
+				if(subvers1 != smartd->SubVers1) ischange++;
+				smartd->SubVers1 = subvers1;
 				memcpy(smartd->BiosDate, _biosDate, 12);
-
+				if(idsubtype != ((SmartTerm *)smartd)->st_type)
+				{	((SmartTerm *)smartd)->st_type = idsubtype;
+					ischange++;
+				}
+				if(ischange)
+					parent->need_save_smt = 1;
 			  rc = 1;
 			}
 			if(oldv == 0)
@@ -572,7 +623,7 @@ int  SmartClient::callback_ask_sts(struct Msg1 *in, int inb, struct Msg1 *out, i
 //rc = 1 = I know ID SmartThertm
 //rc = 2 = I know ID SmartApp
 int SmartClient::callback_ClientID_from_Get_Sts(struct Msg1 *in, int inb)
-{	int rc = 0, ind, _id;
+{	int rc = 0, _id;
 
 	memcpy((void *)&_id,(void *)&in->Buf[0], 4);
 

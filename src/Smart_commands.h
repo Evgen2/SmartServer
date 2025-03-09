@@ -43,13 +43,17 @@
 
 #define  SCMD_GET_STS			0x30 // get controller sts  (server ask controller)
 #define  SCMD_GET_HAND_SHAKE	0x31 //   server ask handhake
-#define  CCMD_SEND_STS_S	0x40 // controller send sts  (controller send server)
+#define  CCMD_SEND_STS_S	0x40 // controller send sts  (controller send to server)
 #define  ACMD_ASK_STS_S		0x50 // applcation ask is controller known  (applcation ask server)
 #define  ACMD_GET_STS_S		0x51 // applcation get controller sts  (applcation ask server)
 
-#define  ACMD_SET_STATE_C	0x52 // applcation set controller state  (applcation send controller)
-#define  ACMD_SET_STATE_S	0x53 // applcation set controller state via server (applcation send server)
-#define  SCMD_SET_STATE_C	0x54 // server set controller state (server send controller)
+#define  ACMD_SET_STATE_C	0x52 // applcation set controller state  (applcation send to controller)
+#define  ACMD_SET_STATE_S	0x53 // applcation set controller state via server (applcation send to server)
+#define  SCMD_SET_STATE_C	0x54 // server set controller state (server send to controller)
+
+#define  CCMD_SEND_OTLOG_S	0x55 // controller send OT log to server (controller send to server)
+#define  SCMD_SEND_OTLOG_C	0x56 // server send answer to controller OT log (server send to controller)
+
 
 #endif //SMART_COMMANDS
 

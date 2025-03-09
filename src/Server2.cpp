@@ -18,8 +18,13 @@ const char * SmartServer::BuildDate = __DATE__;
 
 SmartServer server;   
 
+
 int main(int npar, char* argv[])
 {	int rc;
+	printf("%s v %d.%d.%d build %s\n", APPLICATION_NAME, SERVER_VERSION, SERVER_SUBVERSION, SERVER_SUBVERSION1, SmartServer::BuildDate);
+//  test_dir();
+//  return 0;
+
 #ifdef _WIN32
 rc = SetConsoleCP(1251);
 rc = SetConsoleOutputCP(1251);
@@ -90,10 +95,11 @@ int FindSmartAppId(int _id)
 	return rc;
 }
 
-SmartDevice_stub *AddSmartTherm(unsigned char mac[6], char *_ipaddr)
+SmartDevice_stub *AddSmartTherm(unsigned char mac[6], char *_ipaddr, int st_type)
 {	SmartDevice_stub *pst;
 	if(server.Nsmt <MAX_DEVICES)
 	{	server.smt[server.Nsmt].type = 1;
+		server.smt[server.Nsmt].st_type = st_type;
 		server.smt[server.Nsmt].TCPserver_repot_period = server.controller_report_period;
 		memcpy(server.smt[server.Nsmt].mac, mac,6);
 		server.smt[server.Nsmt].MakeClientId(server.Nsmt);
@@ -121,7 +127,8 @@ SmartDevice_stub *GetSmartDev(int _ind, int idclient, char *_ipaddr, int mode)
 			if(mode)
 				strcpy(pst->ipaddr, _ipaddr);
 			else if(strcmp(pst->ipaddr, _ipaddr)) 
-			{	server.sclient[idclient].Log(3, "Warning: GetSmartDevA current IP addr %s != prev \n", _ipaddr, pst->ipaddr);
+			{	server.sclient[idclient].Log(3, "Warning: GetSmartDevA current IP addr %s != prev %s\n", _ipaddr, pst->ipaddr);
+				strcpy(pst->ipaddr, _ipaddr);
 //				return NULL;
 			}
 			return pst;

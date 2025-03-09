@@ -4,6 +4,42 @@
 
 #include "DeviceType.h"
 
+#define OTlogMAX 1024 //максимальная длина лога в элементах
+#define OTlog_NMAX 10 //максимальное число логов, при превышении идем по кругу
+#define OTlog_EL	8 //длина элемента лога в байтах
+//OT лог
+class Smart_OTlog
+{
+ public:
+	short int lOTlog; //текущий размер OT лога в ST в элементах от ST
+	short int indOTlog; //восстановленный индекс запрошенного элемента лога
+	unsigned int tOTlog;//восстановленное время в мс запрошенного элемента лога
+	unsigned char *pbuf; //буфер
+	int nbuf; //элементов в буфере
+	int lbuf; //длина буфера
+	int indLog; //индекс лога
+	time_t t_start; // time of log
+	short int memberCode;
+	
+	 Smart_OTlog(void)
+	 {	lOTlog = 0;
+		indOTlog = 0;
+		tOTlog = 0;
+		pbuf = NULL;
+		nbuf = 0;
+		lbuf = 0;
+		indLog = -1; 
+		t_start = 0;
+		memberCode = -1;
+	 }
+	 int InitLog(int nl);
+	 int cmdLog(int nl);
+	 int FinishLog(void);
+	 int Add_OT_log(void *_p, int n);
+	 int writeLog(char *fname);
+
+};
+
 enum SmartTermSTS
 {
 	STS_RESTART=0,
@@ -72,8 +108,10 @@ class SmartDevice_stub
 /* контроллер */
 class SmartTerm:public SmartDevice_stub
 {
-	public:  
+	public:
+	int st_type; //controller type: 0 - st32, 1 - st, 2 - st2
 	short int B_flags;
+	short int OTmemberCode;
 //-2 not defined  -1 not init, 0 - normal work, 2 - timeout
 //-2 = информация еще не получена (серевер перезапустился, контроллер не прислал данных)
 	short int stsOT; 
@@ -104,13 +142,18 @@ class SmartTerm:public SmartDevice_stub
 	float TdhwSet_toSet;
 	short int StartSts;
 	short int reset_reason[2];
+	short int lOTlog;
+	short int indOTlog;
+	unsigned int tOTlog;
 
 	SmartApp *pSmA;
-
+	Smart_OTlog OTlog;
 
 	unsigned int ns;  // сколько раз передал информацию (для расчета потребленной энергии)
+
 	SmartTerm(void)
-	{	ns = 0;
+	{	st_type = 0; //st32 or undefined
+		ns = 0;
 		B_flags = 0;
 		stsOT = -2;
 		BoilerStatus = 0;
@@ -129,6 +172,10 @@ class SmartTerm:public SmartDevice_stub
 		StartSts = 0;
 		reset_reason[0] = reset_reason[1] = 0;
 		InT = U0 = 0;
+		lOTlog = 0;
+		indOTlog = 0;
+		tOTlog = 0;
+		OTmemberCode = -1; //неизвестно
 	}
 //    int	WriteSts(FILE *fp);
 //    int	ReadSts(FILE *fp);
@@ -139,9 +186,10 @@ class SmartTerm:public SmartDevice_stub
 	int callback_Get_Sts(struct Msg1 *in, int inb, struct Msg1 *out, int &outb); 
 //	int callback_Get_Sts(struct Msg1 *in, int inb); 
 	int callback_Send_Sts(struct Msg1 *in, int inb, struct Msg1 *out, int &outb); 
+	int callback_Send_OTlog(struct Msg1 *in, int inb, struct Msg1 *out, int &outb); 
 	int write(FILE *fp);
-	int read(FILE *fp);
 	int AnalizeRecodrRead(char *name, char *par);
+	int Write_OT_log(void *p, int n);
 };
 
 /* приложение */

@@ -20,7 +20,7 @@ int num_therads_rt = 0;
 void SmartServer::Server(void)
 {	int rc, ierr, raz, id_client,  client_sock;
     socklen_t addr_len;
-    struct sockaddr_in client;  //�����  �������
+    struct sockaddr_in client;  //lockal client
 	SmartClient *psc;
 
 	clock_t t0;
@@ -176,6 +176,8 @@ void *TCP_ClientThread2( void * lpParam )
 	do
 	{	rc = psc->loop();
 	} while(rc == 0);
+	
+//	printf("Thread Client ending sts %x rc= %d\n", psc->sts_cl, rc); fflush(stdout);
 
 	psc->sts_cl = 0x10; //
 	psc->Log(8, "Thread Client ending sts %x rc= %d\n", psc->sts_cl, rc); fflush(stdout);

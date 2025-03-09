@@ -1159,7 +1159,8 @@ int TCPconnection::Read(char bufin[], int len, int timeout_ms)
          {
 #ifdef _WIN32
               ierr = WSAGetLastError();
-              printf("select( error= %d\n", ierr );
+			  if(ierr != WSAECONNABORTED)
+				printf("select( error= %d\n", ierr );
 #else
              perror("recvfrom");
 #endif //_WIN32
