@@ -24,7 +24,7 @@ static int configNparW=0,  configNparR=0, configNparNeed=0;
 	char str[200];
 	configNparW = 0;
 
-	sprintf(str, "%s v %d.%d.%d build %s", (char *)Appname, Version, SubVersion, SubVersion1, (char *)BuildDate);
+	sprintf(str, "%s v %d.%d.%d.%d build %s", (char *)Appname, Version, SubVersion, SubVersion1, Revision, (char *)BuildDate);
 	cfg.AddC(";%s\n", str, NULL);
 	cfg.AddC(";configversion\n",  NULL);
 	if(configversion == -1)
@@ -148,6 +148,7 @@ int SmartServer::Read_Smt(void)
 	for(i=0; i<Nsmt; i++)
 	{	smt[i].TCPserver_repot_period = controller_report_period;
 		smt[i].sts = STS_INIT;
+		smt[i].mklogDirName();
 	}
 
 	return 0;

@@ -33,12 +33,6 @@
     <ClInclude Include="Connection.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Smart_ServerConfig.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="TCPconnection.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Smart_commands.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -46,6 +40,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="DeviceType.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Smart_ServerConfig.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="OpenTherm.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -72,6 +72,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="SmartServer2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Smart_OT.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -1,6 +1,7 @@
 /* TCPconnection.cpp */
 //UTF-8
 #include "stdafx.h"
+#include "Smart_ServerConfig.h"
 #include "TCPconnection.hpp"
 
 int ShowMyIp(void);
@@ -28,30 +29,26 @@ int TCPconnection::InitClientConnection(int verboze)
 
 	   if(!strcmp((char *)outcmd.Buf,HAND_SHAKE_OUT))
        {
-/*
-           if(online == 0)
-                need_init = 1;
-          online = 1;
-          t_last_work = GetClock();
-*/
-		 printf("Connection to %s OK\n", IpTo);
+		 if(verboze)
+			 printf("Connection to %s OK\n", IpTo);
 /*          */
-    ucmd.cmd = MCMD_ECHO;
-    ucmd.cmd0 =  0xfe;
-    indcmd = (indcmd+1)&0xffff;
-    ucmd.ind =  indcmd;
-	memcpy(ucmd.Buf, HAND_SHAKE_INP,l);
-	l += sizeof(short int)*3+1; //17
-    rc = SendAndConfirm((char *)&ucmd, l, (char *)&outcmd, l,  verboze);
-    if(rc == 0)
-	{    return 0;
-    }
+		ucmd.cmd = MCMD_ECHO;
+		ucmd.cmd0 =  0xfe;
+		indcmd = (indcmd+1)&0xffff;
+		ucmd.ind =  indcmd;
+		memcpy(ucmd.Buf, HAND_SHAKE_INP,l);
+		l += sizeof(short int)*3+1; //17
+		rc = SendAndConfirm((char *)&ucmd, l, (char *)&outcmd, l,  verboze);
+		if(rc == 0)
+		{    return 0;
+		}
 /*         */
-        } else
-               rc = 0x10;
+      } else
+		rc = 0x10;
     } else if(rc == 1) {
 //        online = 0;
- 	   printf("Connection to %s failed\n", IpTo);
+		if(verboze)
+			printf("Connection to %s failed\n", IpTo);
     }
     return -1;
 }
@@ -86,8 +83,7 @@ int TCPconnection::createTCPserverconnection(int _port, int _timeout, int _timeo
        return(1);
     }
     
-	printf("sock0 %x\n", sock0);
-
+//	printf("sock0 %x\n", sock0);
 
 	n = sizeof(sockaddr_in);
     rc = getsockname(sock0, (struct sockaddr *)&client2, &n);
@@ -123,56 +119,14 @@ int TCPconnection::createTCPserverconnection(int _port, int _timeout, int _timeo
 //			printf("SO_REUSEADDR Value: %ld\n", iOptVal);
 		}
 #endif
+
 #if 0
 //SO_EXCLUSIVEADDRUSE
-		iResult = getsockopt(sock0, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, (char *) &iOptVal, &iOptLen);
-		if (iResult == SOCKET_ERROR) {
-			printf("getsockopt for SO_EXCLUSIVEADDRUSE failed with error: %u\n", WSAGetLastError());
-		} else {
-//			printf("SO_EXCLUSIVEADDRUSE Value: %ld\n", iOptVal);
-		}
-
-	    iOptVal = 1;
-		iResult = setsockopt(sock0, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, (char *) &iOptVal, sizeof (iOptVal));
-//		iOptVal = 1;
-//		iResult = setsockopt(sock0, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, (char *) &iOptVal, sizeof(iOptVal));
-		if (iResult == SOCKET_ERROR) {
-	        printf("setsockopt for SO_EXCLUSIVEADDRUSE failed with error: %u\n", WSAGetLastError());
-	    } else {
-//			printf("Set SO_EXCLUSIVEADDRUSE: ON\n");
-		}
-
-		iResult = getsockopt(sock0, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, (char *) &iOptVal, &iOptLen);
-		if (iResult == SOCKET_ERROR) {
-			printf("getsockopt for SO_EXCLUSIVEADDRUSE failed with error: %u\n", WSAGetLastError());
-		} else {
-//			printf("SO_EXCLUSIVEADDRUSE Value: %ld\n", iOptVal);
-		}
-
-#ifdef SO_REUSEPORT
-		iResult = getsockopt(sock0, SOL_SOCKET, SO_REUSEPORT, (char *) &iOptVal, &iOptLen);
-		if (iResult == SOCKET_ERROR) {
-		        printf("setsockopt for SO_REUSEADDR failed with error: %u\n", WSAGetLastError());
-//		else
-//			printf("SO_REUSEPORT: %ld\n", iOptVal);
-
-		iResult = setsockopt(sock0, SOL_SOCKET, SO_REUSEPORT, (char *) &bOptVal, bOptLen);
-		if (iResult == SOCKET_ERROR) {
-	        printf("setsockopt for SO_REUSEPORT failed with error: %u\n", WSAGetLastError());
-	    } else {
-//			printf("Set SO_REUSEPORT: ON\n");
-		}
-
-		iResult = getsockopt(sock0, SOL_SOCKET, SO_REUSEPORT, (char *) &iOptVal, &iOptLen);
-		if (iResult == SOCKET_ERROR) {
-		        printf("setsockopt for SO_REUSEADDR failed with error: %u\n", WSAGetLastError());
-//		else
-//			printf("SO_REUSEPORT: %ld\n", iOptVal);
-#endif
+//SO_REUSEPORT
 #endif 
 
 	}
-#else
+#else //_WIN32
 	{	int iResult; 
 		int iOptVal = 0;
 		socklen_t iOptLen = sizeof (int);
@@ -227,7 +181,8 @@ int TCPconnection::createTCPserverconnection(int _port, int _timeout, int _timeo
 #else
     rc = fcntl(sock0, F_SETFL, O_NONBLOCK);
     if(rc == -1)
-    {   perror("fcntl");
+    {  if(verboze)
+			perror("fcntl");
        closesocket(sock0);
 		   sock0 = -1;
        return(3);
@@ -241,7 +196,8 @@ int TCPconnection::createTCPserverconnection(int _port, int _timeout, int _timeo
 		if(verboze)
 			printf("Ошибка вызова bind error = %d\n", WSAGetLastError() );
 #else
-        perror("bind");
+		if(verboze)
+	        perror("bind");
 #endif //_WIN32
        closesocket(sock0);
        return(2);
@@ -255,15 +211,19 @@ int TCPconnection::createTCPserverconnection(int _port, int _timeout, int _timeo
 
 int TCPconnection::closeConnection(void)
 { 
-#ifdef _WIN32
-#endif 
 	if(sock > 0)
-    { 	printf("closeConnection sock %x\n", sock);
+    { 	
+#if DEBUG_LEVEL > 8
+		printf("closeConnection sock %x\n", sock);
+#endif 
 		closesocket(sock); 
     }
    sock = -1;
    if(sock0 > 0)
-   { 	printf("closeConnection sock0 %x\n", sock0);
+   {
+#if DEBUG_LEVEL > 8
+	   printf("closeConnection sock0 %x\n", sock0);
+#endif 
        closesocket(sock0);
    }
    sock0 = -1;
@@ -283,7 +243,8 @@ int TCPconnection::TCPconnect(int verboze)
       if(verboze)
         printf("socket function failed with error = %d\n", WSAGetLastError() );
 #else
-        perror("socket failed");
+      if(verboze)
+	        perror("socket failed");
 #endif // _WIN32
        return(1);
     }
@@ -302,9 +263,10 @@ int TCPconnection::TCPconnect(int verboze)
 #else
     rc = fcntl(sock, F_SETFL, O_NONBLOCK);
     if(rc == -1)
-    {   perror("fcntl");
-       closesocket(sock);
-       return(3);
+    {	if(verboze)
+			perror("fcntl");
+		closesocket(sock);
+		return(3);
     }
 #endif // WIN32
 
@@ -331,11 +293,12 @@ int TCPconnection::TCPconnect(int verboze)
 		return 2;
      }
 #else
-	 perror("connect");
-	 printf("(Try connect to %s port %i)\n", IpTo, port);
 	 if(verboze)
-       printf("Cann't establish TCP connection\r\n");
-       closesocket(sock);
+	 {	perror("connect");
+		printf("(Try connect to %s port %i)\n", IpTo, port);
+		printf("Cann't establish TCP connection\r\n");
+	 }
+	 closesocket(sock);
 		   sock = -1;
        return 2;
 #endif
@@ -363,13 +326,15 @@ int TCPconnection::TCPconnect(int verboze)
 	    printf("Connect to %s port %i failed with error = %d\n", IpTo, port, errcode);
 	}
 #else
-	     perror("connect");
+	if(verboze)
+	{	perror("connect");
 	    printf("(Try connect to %s port %i)\n", IpTo, port);
+	}
 #endif
 	if(verboze)
        printf("Cann't establish TCP connection\r\n");
-       closesocket(sock);
-		   sock = -1;
+	closesocket(sock);
+	sock = -1;
        return 2;
    };
 
@@ -422,9 +387,9 @@ int TCPconnection::createTCPconnection(char _IpTo[], int _port, int _timeout, in
 #ifdef _WIN32
       if(verboze)
         printf("socket function failed with error = %d\n", WSAGetLastError() );
-        perror("socket failed");
 #else
-        perror("socket failed");
+      if(verboze)
+		perror("socket failed");
 #endif // _WIN32
        return(1);
     }
@@ -443,8 +408,9 @@ int TCPconnection::createTCPconnection(char _IpTo[], int _port, int _timeout, in
 #else
     rc = fcntl(sock, F_SETFL, O_NONBLOCK);
     if(rc == -1)
-    {   perror("fcntl");
-       closesocket(sock);
+    { if(verboze)
+		perror("fcntl");
+      closesocket(sock);
        return(3);
     }
 #endif // WIN32
@@ -475,10 +441,11 @@ int TCPconnection::createTCPconnection(char _IpTo[], int _port, int _timeout, in
 		return 2;
 	  }
 #else
-	perror("connect");
-	printf("(Try connect to %s port %i\n", _IpTo, _port);
 	if(verboze)
+	{	perror("connect");
+		printf("(Try connect to %s port %i\n", _IpTo, _port);
 		printf("Cann't establish TCP connection\r\n");
+	}
 	closesocket(sock);
 	   sock = -1;
 	return 2;
@@ -507,13 +474,15 @@ int TCPconnection::createTCPconnection(char _IpTo[], int _port, int _timeout, in
 	    printf("Connect to %s port %i failed with error = %d\n", _IpTo, _port, errcode);
 	}
 #else
-	     perror("connect ()");
+	if(verboze)
+	{    perror("connect ()");
 	     printf("(Try connect to %s port %i)\n", _IpTo, _port);
+	}
 #endif
 	if(verboze)
        printf("Cann't establish TCP connection\r\n");
-       closesocket(sock);
-		   sock = -1;
+     closesocket(sock);
+	 sock = -1;
        return 2;
    };
 
@@ -549,37 +518,6 @@ int TCPconnection::reTCPconnect(void)
 {  int rc;
    closeConnection();
    rc = TCPconnect(1);
-#if 0
-   rc = connect(sock, (struct sockaddr *) &server, sizeof (struct sockaddr_in));
-  if (rc==(-1))
-  {  
-#ifdef _WIN32
-	  int errcode;
-	  errcode = WSAGetLastError();
-	  if(errcode == WSAEISCONN)
-	  {
-        printf("already connected\n" );
-		return 0;
-	  }
-
-	  if(errcode ==  WSAETIMEDOUT)
-//        printf("connect  to %s port %i timeout\n",_IpTo, _port );
-        printf("connect  timeout\n" );
-	  else
-	    printf("reConnect failed with error = %d\n",  errcode);
-//	    printf("Connect to %s port %i failed with error = %d\n", _IpTo, _port, errcode);
-#else
-	     _wperror("connect");
-	    printf("(Try connect to %s port %i)\n", _IpTo, _port);
-#endif
-       printf("Cann't establish TCP connection\r\n");
-       closesocket(sock);
-		   sock = -1;
-       return 2;
-   };
-printf("TCP connection established !!!\r\n");
-  return 0;
-#endif 
   return rc;
 }
 
@@ -668,7 +606,8 @@ M0:
 			   }
            }
 #else
-        perror("recv");
+		if(verboze)
+			perror("recv");
 #endif // _WIN32          ierr = WSAGetLastError();
            stat[4]++;
     } else {
@@ -706,10 +645,11 @@ M0:
       if(rc == SOCKET_ERROR)
       {
 #ifdef _WIN32
-          ierr = WSAGetLastError();
-           printf("sendto error= %d\n", ierr );
+		if(verboze)
+           printf("sendto error= %d\n", WSAGetLastError());
 #else
-         perror("sendto");
+		if(verboze)
+	         perror("sendto");
 #endif // _WIN32
          rc0 = ierr;
          stat[1]++;
@@ -748,9 +688,10 @@ M0:
       if(num == SOCKET_ERROR)
       {
 #ifdef _WIN32
-          ierr = WSAGetLastError();
-           printf("select( error= %d\n", ierr );
+		if(verboze)
+           printf("select( error= %d\n", WSAGetLastError() );
 #else
+		if(verboze)
            perror("select");
 #endif // _WIN32
 	  }
@@ -762,9 +703,10 @@ M0:
           {   if(rc == SOCKET_ERROR)
                {
 #ifdef _WIN32
-                    ierr = WSAGetLastError();
-                    printf("recv error= %d\n", ierr );
+				if(verboze)
+                    printf("recv error= %d\n", WSAGetLastError() );
 #else
+				if(verboze)
                     perror("recv");
 #endif // _WIN32
 
@@ -821,7 +763,7 @@ M0:
 					}
 				}
 			   
-			   if(nb != lenout) 
+			   if(nb != lenout && verboze) 
                {  printf("\a\nGet: %i bytes  != %i, cmdR=%i S=%i rS=%i<\n",
                     nb, lenout, pm2->cmd, pm1->cmd, razSendold);
                  stat[5]++;
@@ -879,12 +821,15 @@ M0:
 //rc = 4 длина входного буфера неправильная
 //rc = 5 длина выходного буфера не равна длине полученного сообщения
 int TCPconnection::SendAndConfirm2(char bufin[], int len, char bufout[], int lenout, int shiftLansw, int size0, int FirstByte)
-{  int i, rc, nb=0, nRep=0, rc0=0, nRepRoute=0, isTimeout, isTimeout2;
+{  int rc, nb=0, nRep=0, rc0=0, nRepRoute=0, isTimeout, isTimeout2;
    int razSend = 0, raz;
    unsigned char buff_out[1500];
    int tout0Answer, tout1Answer,la=0;
-   int tout0, tout1, num;
+   int tout0, tout1;
    int start = 0;
+#if DEBUG_LEVEL > 8
+   int i;
+#endif
    if(sock <= 0)
         return 3;
 
@@ -898,12 +843,16 @@ int TCPconnection::SendAndConfirm2(char bufin[], int len, char bufout[], int len
           ierr = WSAGetLastError();
           if(WSAEWOULDBLOCK != ierr)
            {
-                 printf("recv error= %d\n", ierr );
+ #if DEBUG_LEVEL > 8
+			   printf("recv error= %d\n", ierr );
+ #endif
                  rc0 = ierr;
                  stat[3]++;
            }
 #else
+ #if DEBUG_LEVEL > 8
           perror("recv");
+ #endif
 #endif // _WIN32
 
            stat[4]++;
@@ -933,14 +882,14 @@ int TCPconnection::SendAndConfirm2(char bufin[], int len, char bufout[], int len
       rc = sendto(sock,bufin,len,0,(struct sockaddr *)&server,sizeof(sockaddr_in));
       if(rc == SOCKET_ERROR)
       {
-
-#ifdef _WIN32
+#if DEBUG_LEVEL > 8
+ #ifdef _WIN32
           ierr = WSAGetLastError();
            printf("sendto error= %d\n", ierr );
-#else
+ #else
          perror("sendto");
-#endif // _WIN32
-
+ #endif // _WIN32
+#endif
          rc0 = ierr;
          stat[1]++;
          break;
@@ -974,6 +923,7 @@ int TCPconnection::SendAndConfirm2(char bufin[], int len, char bufout[], int len
   timeout_us.tv_usec = timeout_ms;
   num = select(sizeof(fds)*8, &fds, NULL, NULL, &timeout_us);
 
+#if DEBUG_LEVEL > 8
       if(num == SOCKET_ERROR)
       {
 #ifdef _WIN32
@@ -983,6 +933,7 @@ int TCPconnection::SendAndConfirm2(char bufin[], int len, char bufout[], int len
            perror("select");
 #endif // _WIN32
 	  }
+#endif
   rc = -2;
   if(num)
           rc = recv(sock, (char *)&buff_out,sizeof(buff_out),0);
@@ -992,13 +943,14 @@ int TCPconnection::SendAndConfirm2(char bufin[], int len, char bufout[], int len
           if(rc < 0)
           {   if(rc == SOCKET_ERROR)
                {
-#ifdef _WIN32
+#if DEBUG_LEVEL > 8
+ #ifdef _WIN32
           ierr = WSAGetLastError();
           printf("recv error= %d\n", ierr );
-#else
+ #else
           perror("recv");
-#endif // _WIN32
-
+ #endif // _WIN32
+#endif
 					break;
 			   }
                  tout1Answer = GetClock();
@@ -1055,11 +1007,7 @@ int TCPconnection::SendAndConfirm2(char bufin[], int len, char bufout[], int len
       } else {
            if(nb != la)
            {
-//               la = (int) *((short int *) &buff_out[shiftLansw]);
-//               la = la * size0 + shiftLansw + 2;
-
-//               if(la != nb)
-//               {
+#if DEBUG_LEVEL > 8
                   printf("\a\n2Get: %i байт != %i\n",nb, la);
                  stat[5]++;
                  rc0 = 5;
@@ -1068,23 +1016,20 @@ int TCPconnection::SendAndConfirm2(char bufin[], int len, char bufout[], int len
                  printf("\n>");
                   for(i=0; i < nb; i++) printf("%2x ",buff_out[i]&0xff);
                  printf("\n");
+#endif
+
                  return 5;
-//             }
-                isTimeout2 = 0;
-                break;
-//todo!!!
-//           if(buff[0] != ncmd)
+//                isTimeout2 = 0;
+//                break;
            } else {
-//                for(i=0; i < rc; i++) printf("%2x ",buff_out[i]);
-///                printf("\n");
                 isTimeout2 = 0;
                break;
            }
 
       }
       tout1 = GetClock();
-printf("raz=%i rc=%i num=%i razSend=%i nb=%i dt=%i %i %i\n", raz, rc, num, razSend, nb,
-     tout1 - tout0Answer, tout1-tout0,  timeoutAnswer);
+//printf("raz=%i rc=%i num=%i razSend=%i nb=%i dt=%i %i %i\n", raz, rc, num, razSend, nb,
+//     tout1 - tout0Answer, tout1-tout0,  timeoutAnswer);
 
    } while(abs(tout1 - tout0) < timeout);
 
@@ -1103,11 +1048,12 @@ printf("raz=%i rc=%i num=%i razSend=%i nb=%i dt=%i %i %i\n", raz, rc, num, razSe
       }
    }
 
+#if DEBUG_LEVEL > 8
    if(razSend>1)
       printf("!!2!razSend=%i\n",razSend);
   if(isTimeout2)
       printf("!!2!isTimeout2 nb=%i\n", nb);
-
+#endif
    return rc0;
 }
 
@@ -1139,12 +1085,14 @@ int TCPconnection::Read(char bufin[], int len, int timeout_ms)
    num = select(FD_SETSIZE, &fds, NULL, NULL, &timeout_us);
    if(num == SOCKET_ERROR)
    {
-#ifdef _WIN32
+#if DEBUG_LEVEL > 8
+ #ifdef _WIN32
        ierr = WSAGetLastError();
        printf("select( error= %d\n", ierr );
-#else
+ #else
        perror("select");
-#endif // _WIN32
+ #endif // _WIN32
+#endif
        return -2;
    }
    if(num == 0)
@@ -1157,27 +1105,21 @@ int TCPconnection::Read(char bufin[], int len, int timeout_ms)
     if(rc < 0)
     {   if(rc == SOCKET_ERROR)
          {
-#ifdef _WIN32
+#if DEBUG_LEVEL > 8
+ #ifdef _WIN32
               ierr = WSAGetLastError();
 			  if(ierr != WSAECONNABORTED)
-				printf("select( error= %d\n", ierr );
-#else
+				printf("recvfrom error= %d\n", ierr );
+ #else
              perror("recvfrom");
-#endif //_WIN32
+ #endif //_WIN32
+#endif
 			  return -3;
 	     }
 //         printf("recv rc= %d\n", rc);
 		 return -4;
 	} else if(rc == 0) {
 		;
-/*         printf("select rc %d recvfrom rc %d\n", num, rc);
-
-		{  char str[20];
-inet_ntop(AF_INET, &(client.sin_addr), str, INET_ADDRSTRLEN);
-
-printf("CLIENT  %s\n",  str);
-		}
-*/
 	}  else {
 //         printf("1select rc %d recvfrom rc %d\n", num, rc);
 		 timeLastRW = time(NULL);
@@ -1198,12 +1140,14 @@ int TCPconnection::Send(char buf[], int len)
     rc = sendto(sock,buf,len,0,(struct sockaddr *)&client,sizeof(sockaddr_in));
     if(rc == SOCKET_ERROR)
     {
-#ifdef _WIN32
+#if DEBUG_LEVEL > 8
+ #ifdef _WIN32
          ierr = WSAGetLastError();
          printf("sendto error= %d\n", ierr );
-#else
+ #else
          perror("sendto");
-#endif // _WIN32
+ #endif // _WIN32
+#endif
          return -1;
     }
 

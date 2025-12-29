@@ -10,18 +10,18 @@ void CL_cleanup(void);
 const char ConfigFile[] = "SmartServer.cfg";
 char * SmartServer::Appname = (char *)APPLICATION_NAME;
 int  SmartServer::Version = SERVER_VERSION;
-int  SmartServer::SubVersion = SERVER_SUBVERSION;
-int  SmartServer::SubVersion1= SERVER_SUBVERSION1;
+int  SmartServer::SubVersion  = SERVER_SUBVERSION;
+int  SmartServer::SubVersion1 = SERVER_SUBVERSION1;
+int  SmartServer::Revision	  = SERVER_Revision;
 int  SmartServer::IdNumber = 0;
 
 const char * SmartServer::BuildDate = __DATE__;
 
 SmartServer server;   
 
-
 int main(int npar, char* argv[])
 {	int rc;
-	printf("%s v %d.%d.%d build %s\n", APPLICATION_NAME, SERVER_VERSION, SERVER_SUBVERSION, SERVER_SUBVERSION1, SmartServer::BuildDate);
+	printf("%s v %d.%d.%d.%d build %s\n", APPLICATION_NAME, SERVER_VERSION, SERVER_SUBVERSION, SERVER_SUBVERSION1, SERVER_Revision, SmartServer::BuildDate);
 //  test_dir();
 //  return 0;
 

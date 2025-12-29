@@ -141,7 +141,7 @@ void SmartServer::Server(void)
 				printf("wait Client id %d sts %d (%d)\n", id_client,  sclient[id_client].sts_cl, raz);
 			raz++;
 		}
-	printf("thr %d/%d Nsmt %d Nsma %d start Client id %d sts %d\r", num_therads,num_therads_rt, Nsmt, Nsma, id_client,  sclient[id_client].sts_cl);
+	printf("thr %d Nsmt %d Nsma %d start Client id %d sts %d\r", num_therads_rt, Nsmt, Nsma, id_client,  sclient[id_client].sts_cl);
 	fflush(stdout);
 		Sleep(10);
 		if(need_save_smt)

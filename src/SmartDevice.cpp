@@ -178,6 +178,37 @@ int SmartTerm::callback_Send_OTlog(struct Msg1 *in, int inb, struct Msg1 *out, i
 	return rc;
 }
 
+//CCMD_SEND_LOG_S
+int SmartTerm::callback_Send_log(struct Msg1 *in, int inb, struct Msg1 *out, int &outb)
+{	int rc = 0, rc1=0;
+	unsigned short int m_ind, mN, m_ls, m_n, m_l;
+	out->cmd = SCMD_SEND_LOG_C;
+	outb = 8;
+	if(inb < 20)
+		return -1;
+	memcpy((void *)&m_ind,(void *)&in->Buf[4], 2); // message index
+	memcpy((void *)&mN,  (void *)&in->Buf[6], 2);  // total number of messages 
+	memcpy((void *)&m_ls,(void *)&in->Buf[8], 2);  // start index to send
+	memcpy((void *)&m_n, (void *)&in->Buf[10], 2); // number of chars to send
+	memcpy((void *)&m_l, (void *)&in->Buf[12], 2); // total length of string to send
+	if(inb < 20 + m_n)
+		return -2;
+	log.writeLog(logDirName, log_mode, log_type);
+	rc1 = log.Add_log((void *)&in->Buf[14], m_ls, m_n, m_l, m_ind, mN, log_type);
+	if(m_ls + m_n == m_l)
+	{ if(m_ind + 1 <= mN)
+		rc = 1;  
+	} else {
+		rc = 1; 
+	}
+	if(rc == 0)
+		printf("лялял");
+	memcpy(&out->Buf[0], &m_ls,2);
+//rc = 0 => needclose = 1;
+//rc = 1 => needclose = 0;
+	return rc;
+}
+
 //CCMD_SEND_STS_S answer
 int SmartTerm::callback_Send_Sts(struct Msg1 *in, int inb, struct Msg1 *out, int &outb)
 {	int rc = 0, tmp=0;
@@ -205,31 +236,43 @@ int SmartTerm::callback_Send_Sts(struct Msg1 *in, int inb, struct Msg1 *out, int
 			remote_cmd = 0x10;
 	else 
 	{
-		if(OTlog.lOTlog == 0 && lOTlog > 0) OTlog.InitLog(lOTlog);
-		if(OTlog.lOTlog > 0)
-		{	tmp = OTlog.cmdLog(lOTlog);
-			if(tmp > 0)
-			{	remote_cmd = 0x02;
-			} else {
-				char dirname[80];
+		if(lOTlog & 0x8000)
+		{	if(OTlog.lOTlog > 0)
+			{	char dirname[80];
+				char info[256];
+
 				sprintf(dirname,"st_%d", ClientId);
-				OTlog.writeLog(dirname);
+				sprintf(info,"version=%d.%d.%d.%d %12s\n;reset reason: %d %d (%d %d %d %d %d)", 
+						Vers, SubVers, SubVers1,Revision, BiosDate, reset_reason[0],reset_reason[1],
+						bootsts[0],bootsts[1],bootsts[2],bootsts[3],bootsts[4]);
+      
+				OTlog.writeLog(dirname, info);
 				OTlog.FinishLog();
-				if(OTlog.memberCode >= 0)
+				if(OTlog.memberCode >= 0 && OTmemberCode != OTlog.memberCode)
 				{	OTmemberCode = OTlog.memberCode;
 					parent->need_save_smt = 1;
 				}
 			}
-		}
 
-//		if(lOTlog > 0)
-//			remote_cmd = 0x02;
+			lOTlog &= ~0x8000;
+			if(lOTlog > 0 && log_mode)
+				remote_cmd = 0x03;
+
+		} else {
+			if(OTlog.lOTlog == 0 && lOTlog > 0) OTlog.InitLog(lOTlog);
+			if(OTlog.lOTlog > 0)
+			{	tmp = OTlog.cmdLog(lOTlog);
+				if(tmp > 0)
+					remote_cmd = 0x02;
+			}
+		}
 	}
 	memcpy(&out->Buf[4], &remote_cmd,2);
 	switch(remote_cmd)
 	{	case 0: // подтверждение + ReportPeriod
 			outb = 6+4+2;
 			break;
+
 		case 1: // подтверждение + ReportPeriod + задать параметры
 			memcpy(&out->Buf[6], &B_flags_toSet,2);
 			memcpy(&out->Buf[8], &Tset_toSet,4);
@@ -242,8 +285,14 @@ int SmartTerm::callback_Send_Sts(struct Msg1 *in, int inb, struct Msg1 *out, int
 		case 2: //cmd to send CCMD_SEND_OTLOG_S
 //			tmp = lOTlog;
 //			if(tmp > 15) tmp = 15;
-			memcpy(&out->Buf[6], &tmp,4);
+			memcpy(&out->Buf[6], &tmp,4); //todo 
 			outb = 6+4*2+2;
+			isCmd = 0;
+			rc = 1;
+			break;
+		
+		case 3: //CCMD_SEND_LOG_S
+			outb = 6+4+2;
 			isCmd = 0;
 			rc = 1;
 			break;
@@ -345,17 +394,26 @@ M: pstr= fgets(str,128,fp);
    return 0;
 }
 
+extern char * GetOTVendorName(int id);
+
 int SmartTerm::write(FILE *fp)
-{
+{	char *pstr;
 		fprintf(fp,"smt.MAC=%02x:%02x:%02x:%02x:%02x:%02x\n", mac[0], mac[1], mac[2], mac[3], mac[4],mac[5] );
 		fprintf(fp,"smt.type=%d\n", type);
 		fprintf(fp,"smt.st_type=%d\n", st_type);
-		fprintf(fp,"smt.version=%d.%d.%d\n", Vers, SubVers, SubVers1);
+		fprintf(fp,"smt.version=%d.%d.%d.%d %12s\n", Vers, SubVers, SubVers1,Revision, BiosDate);
 		fprintf(fp,"smt.ipaddr=%s\n", ipaddr);
 		fprintf(fp,"smt.OTmemberCode=%d\n", OTmemberCode);
+	pstr = GetOTVendorName(OTmemberCode);
+	if(pstr)
+	{	fprintf(fp,"; %s\n", pstr);
+	} 
+
 		fprintf(fp,"smt.ClientId=%x\n", ClientId);
 		fprintf(fp,"smt.ClientId_k=%x\n", ClientId_k);
-		
+		fprintf(fp,"smt.log_mode=%d\n", log_mode); //0 - не читать, 1 - писать в stdout, 2 - писать в файл
+		fprintf(fp,"smt.log_type=%d\n", log_type); //todo: 0 - минимальный
+	
 		return 0;
 }
 
@@ -364,10 +422,9 @@ int SmartTerm::AnalizeRecodrRead(char *name, char *par)
 
 static const char *lprgsNames[]=
 { "MAC",  "type", "ipaddr", "ClientId", "ClientId_k",
-  "OTmemberCode", "version","st_type",
+  "OTmemberCode", "version","st_type","log_mode","log_type",
   NULL
 };
-
 
   for(i=0;lprgsNames[i];i++)
   {
@@ -426,12 +483,14 @@ static const char *lprgsNames[]=
        break;
 
 	 case 6: /* version */
-		{	int v, sv, sv1;
-	        rc = sscanf(par,"%d.%d.%d",&v, &sv, &sv1);
-			if(rc == 3)
+		{	int v, sv, sv1, rv;
+	        rc = sscanf(par,"%d.%d.%d.%d",&v, &sv, &sv1, &rv);
+			if(rc >= 3)
 			{	Vers = v;
 				SubVers = sv;
 				SubVers1 = sv1;
+				if(rc == 4)
+					Revision = rv;
 			}
 		}
        break;
@@ -443,11 +502,53 @@ static const char *lprgsNames[]=
 			st_type = tmp;
       }  
        break;
+
+     case 8:  /* log_mode */
+      { int tmp;
+        rc = sscanf(par,"%d",&tmp);
+		if(rc > 0)
+			log_mode = tmp;
+      }  
+       break;
+
+     case 9:  /* log_type */
+      { int tmp;
+        rc = sscanf(par,"%d",&tmp);
+		if(rc > 0)
+			log_type = tmp;
+      }  
+       break;
   }
 
   return 0;
 }
 
+#ifdef _WIN32
+#include <direct.h>
+#else 
+#include <sys/stat.h> // stat
+#endif
+#include <stdlib.h>
+
+void SmartTerm::mklogDirName(void)
+{	if(logDirName == NULL)
+	{	char dirname[80];
+//		int rc;
+		sprintf(dirname,"st_%d", ClientId);
+		logDirName = _strdup(dirname);
+#ifdef _WIN32
+		_mkdir(dirname);
+//	rc =_mkdir(dirname);
+//	if(rc == EEXIST)
+//		printf("dir exist\n");
+#else // WIN32
+		struct stat st = {0};
+		if (stat(dirname, &st) == -1)
+		{   mkdir(dirname, 0700);
+		}
+#endif // WIN32
+	}
+}
 
 int SmartApp::loop1( struct Msg1 *out, int &outb)
 {	
@@ -630,3 +731,55 @@ int SmartDevice_stub::Log(int level, const char *_format, ...)
 	return 0;
 
 }
+
+int Smart_log::Add_log(void *_p, int m_ls, int m_n, int m_l, int m_ind, int mN, int mode)
+{
+	memcpy(&buf[m_ls], _p, m_n);
+
+	if(m_ls + m_n == m_l)
+	{	buf[m_l] = 0;
+		if(m_l > 1 && buf[m_l-1] == '\n')
+			 buf[m_l-1] = 0;
+		if(mode & 0x01)
+			printf("%s\n", buf);
+//			printf("%d(%d),%s\n", m_ind, mN, buf);
+		if(mode & 0x02)
+		{	FILE *fp;
+			fp = fopen(fname,"a"); 
+			fprintf(fp, "%s\n", buf);
+//			fprintf(fp, "%d(%d),%s\n", m_ind, mN, buf);
+			fclose(fp);
+		}
+	}
+
+	return 0;
+}
+void CreatePath_log(char *pathname, char *dirname, char *filename);
+
+int Smart_log::writeLog(char *dirname, int logmode, int logtype)
+{	char filename[40], pathname[80];
+	if(!(logtype & 0x02))
+		return 1;
+	if(fname == NULL)
+	{
+		sprintf(filename, "st_%d", logmode);
+#ifdef _WIN32
+   _makepath(pathname,NULL,dirname,filename,".log");
+   printf("pathname %s\n",  pathname);
+//	printf("check existance dir %s\n",  dirname);
+//	printf("Widows:\n");
+//	rc = _mkdir(dirname);
+//	if(rc == EEXIST)
+//		printf("dir exist\n");
+#else // WIN32
+//	printf("Linux:\n");
+	strcpy(pathname,dirname);
+	strcat(pathname,"/");
+	strcat(pathname,filename);
+	strcat(pathname,".log");
+#endif // WIN32
+		fname = _strdup(pathname);
+	}
+	return 0;
+}
+

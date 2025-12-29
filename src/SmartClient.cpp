@@ -26,7 +26,7 @@ int SmartClient::loop(void)
 		}
 	} else if(rc0 == 0) {
 		dt = difftime(time(NULL), tlastc);
-		if(dt < 3)
+		if(dt < 5) //3
 		{	Sleep(20);
 		} else {
 			Log(9,"Close client on timeout, dt %.f sec\n", dt);
@@ -39,7 +39,7 @@ int SmartClient::loop(void)
 //	if(rc != 0)
 //		printf("loop rc =%d\n", rc);
 	if(rc == 0)
-		Sleep(20);
+		Sleep(20); // ????
 	else
 		OnClose();
 	return rc;
@@ -230,6 +230,29 @@ int SmartClient::ParseFromTCP(int nb, int &Lsend, int &needclose)
 		}
 			break;
 
+		case CCMD_SEND_LOG_S:
+		{	SmartTerm *st;
+			st = (SmartTerm *)smartd; 
+			if(st == NULL)
+			{   Log(2, "Error:CCMD_SEND_LOG_S st == NULL \n");
+					   break;
+			}
+			st->tlastc = time(NULL);
+		Log(10, "ParseFromTCP CCMD_SEND_LOG_S\n");
+
+			rc = st->callback_Send_log(pucmd, nb, &MsgOut, Lsend);
+	   Log(10, "ParseFromTCP CCMD_SEND_LOG_S rc =%d nb = %d Lsend=%d\n", rc, nb, Lsend);
+			if(rc > 0)
+			{	st->sts = STS_REPORT_ANSWER; //todo
+				needclose = 0;
+			} else {
+				st->sts = STS_REPORT_ANSWER;
+				needclose = 1;
+			}
+		}
+
+			break;
+
 		case MCMD_GET_OT_INFO:
 		{	SmartTerm *st;
 			st = (SmartTerm *)smartd; 
@@ -408,6 +431,33 @@ extern int FindSmartApp(unsigned char mac[6]);
 extern SmartDevice_stub *GetSmartAdd(int ind);
 extern SmartDevice_stub *AddSmartApp(unsigned char mac[6], char *_ipaddr,  int ind);
 
+time_t GetTimeDate(char *date)
+{ struct tm tmCompile;
+  time_t tsCompile=0;
+  char monthNames[37] ="JanFebMarAprMayJunJulAugSepOctNovDec";
+  char monthCur[4] ={0};
+  int rc, mon=0;
+
+  memset(&tmCompile, 0, sizeof(tmCompile));
+  if(strchr(date,'-')) /* "2025-12-25" Android */
+  {	rc = sscanf(date, "%d-%d-%d",&tmCompile.tm_year, &mon, &tmCompile.tm_mday);
+	if(rc != 3)
+		return 0;
+	tmCompile.tm_mon = mon-1; 
+  } else { /* "Nov 20 2025" esp+PC */
+	rc = sscanf(date, "%s %d %d", monthCur, &tmCompile.tm_mday, &tmCompile.tm_year);
+	if(rc != 3)
+		return 0;
+	tmCompile.tm_mon = (strstr(monthNames, monthCur)-monthNames)/3;
+  }
+  tmCompile.tm_year -= 1900;
+  tmCompile.tm_isdst = 0; 
+  tsCompile = mktime(&tmCompile);
+//  tsCompile -= COMPILE_TZ * 3600;
+  return tsCompile;  
+}
+
+
 
 //MCMD_INTRODUCESELF
 //rc < 0 error
@@ -415,8 +465,8 @@ extern SmartDevice_stub *AddSmartApp(unsigned char mac[6], char *_ipaddr,  int i
 //     1 - new dev
 //     2 - new app
 int  SmartClient::callback_Introduce(struct Msg1 *in, int inb, struct Msg1 *out, int &outb) 
-{	int l, rc = -1,  ind, id, oldv=0, ischange;
-	int idcode, idNumber, vers, subvers, subvers1;
+{	int l, rc = -1,  ind, id, oldv = 0, oldv1 = 0, ischange;
+	int idcode, idNumber, vers, subvers, subvers1, revision;
 	unsigned short int idtype, idsubtype;
 	short int ld;
 	char _biosDate[12];     /* дата компил€ции биоса */
@@ -438,8 +488,26 @@ int  SmartClient::callback_Introduce(struct Msg1 *in, int inb, struct Msg1 *out,
 	idNumber = *((int *)&in->Buf[10]);
 	vers     = *((int *)&in->Buf[14]);
 	subvers  = *((int *)&in->Buf[18]);
-	subvers1 = *((int *)&in->Buf[22]);
     memcpy(_biosDate,((void *)&in->Buf[26]),12);
+
+	{   time_t tdate;
+		const time_t tdate0 = 1764536400;
+//		const char biosDate_4[12]="Dec 1 2025";    
+//		tdate0 = GetTimeDate((char *) biosDate_4); //= 1764536400
+
+		tdate = GetTimeDate(_biosDate);
+		if(tdate > tdate0)
+		{
+			subvers1 = *((unsigned short int *)&in->Buf[22]);
+			revision = *((unsigned short int *)&in->Buf[24]);
+			oldv1 = 0;
+		} else {
+			subvers1 = *((int *)&in->Buf[22]);
+			revision = 0;
+			oldv1 = 1;
+		}
+
+	}
     memcpy(mac,((void *)&in->Buf[38]),6);
 //printf("MAC %02x:%02x:%02x:%02x:%02x:%02x\n",mac[0], mac[1], mac[2], mac[3], mac[4],mac[5] );
 	l = ld - (24+12+6);
@@ -447,7 +515,9 @@ int  SmartClient::callback_Introduce(struct Msg1 *in, int inb, struct Msg1 *out,
 	{	oldv = 1;
 	} else {
 		oldv = 0;
-		l = ld - (24+12+6+3);
+		l = ld - 45;
+		if(oldv1 == 0)
+			l = ld - 58;
 	}
 	
 	if(l > 0)
@@ -484,7 +554,9 @@ int  SmartClient::callback_Introduce(struct Msg1 *in, int inb, struct Msg1 *out,
 				   smartd->Vers = vers;
 				   smartd->SubVers = subvers;
 				   smartd->SubVers1= subvers1;
+				   smartd->Revision= revision;
 				   memcpy(smartd->BiosDate, _biosDate, 12);
+				   ((SmartTerm *)smartd)->mklogDirName();
 				   rc = 1;
 				}
 			} else {
@@ -492,11 +564,13 @@ int  SmartClient::callback_Introduce(struct Msg1 *in, int inb, struct Msg1 *out,
 //			  printf("контроллер ind %d\n", ind);
 				smartd = GetSmartDev(ind, idclient, ipaddr,1);
 				if(vers != smartd->Vers) ischange++;
-				smartd->Vers = vers;
+					smartd->Vers = vers;
 				if(subvers != smartd->SubVers) ischange++;
-				smartd->SubVers = subvers;
+					smartd->SubVers = subvers;
 				if(subvers1 != smartd->SubVers1) ischange++;
-				smartd->SubVers1 = subvers1;
+					smartd->SubVers1 = subvers1;
+				if(revision != smartd->Revision) ischange++;
+					smartd->Revision = revision;
 				memcpy(smartd->BiosDate, _biosDate, 12);
 				if(idsubtype != ((SmartTerm *)smartd)->st_type)
 				{	((SmartTerm *)smartd)->st_type = idsubtype;
@@ -507,10 +581,26 @@ int  SmartClient::callback_Introduce(struct Msg1 *in, int inb, struct Msg1 *out,
 			  rc = 1;
 			}
 			if(oldv == 0)
-			{
+			{	short int _stsOT, _memderID;
+				int i;
 				((SmartTerm *)smartd)->StartSts = in->Buf[44+l];
 				((SmartTerm *)smartd)->reset_reason[0] = in->Buf[45+l];
 				((SmartTerm *)smartd)->reset_reason[1] = in->Buf[46+l];
+				if(oldv1 == 0)
+				{	_memderID = in->Buf[47+l];
+					_stsOT = *((unsigned short int *)&in->Buf[48+l]);
+					if(_stsOT == 0)
+					{	if(((SmartTerm *)smartd)->OTmemberCode == -1 || _memderID != ((SmartTerm *)smartd)->OTmemberCode)
+						{	((SmartTerm *)smartd)->OTmemberCode = _memderID;
+							ischange++;
+							parent->need_save_smt = 1;
+						}
+					}
+					((SmartTerm *)smartd)->stsOT = _stsOT;
+					for(i=0;i<5;i++)
+					{	((SmartTerm *)smartd)->bootsts[i] = *((unsigned short int *)&in->Buf[50+l+i*2]);
+					}
+				}
 				if(((SmartTerm *)smartd)->StartSts == 1) 
 				{	if(((SmartTerm *)smartd)->U0 > 0.)
 							((SmartTerm *)smartd)->isCmd = 0x10;
@@ -547,8 +637,9 @@ int  SmartClient::callback_Introduce(struct Msg1 *in, int inb, struct Msg1 *out,
 							rc = -1;
 					} else {
 					   smartd->Vers = vers;
-					   smartd->SubVers = subvers;
-					   smartd->SubVers1= subvers1;
+					   smartd->SubVers  = subvers;
+					   smartd->SubVers1 = subvers1;
+					   smartd->Revision = revision;
 					   memcpy(smartd->BiosDate, _biosDate, 12);
 						rc = 2;
 					}
@@ -702,3 +793,4 @@ int SmartClient::Log(int level, const char *_format, ...)
     va_end(args);
 	return 0;
 }
+

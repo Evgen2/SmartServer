@@ -36,9 +36,23 @@ class Smart_OTlog
 	 int cmdLog(int nl);
 	 int FinishLog(void);
 	 int Add_OT_log(void *_p, int n);
-	 int writeLog(char *fname);
+	 int writeLog(char *fname, char *_info);
 
 };
+
+//текстовый лог
+class Smart_log
+{
+ public:
+	 char buf[512];
+	 char *fname;
+	 Smart_log()
+	 {	fname = NULL;
+	 }
+	 int Add_log(void *_p, int m_ls, int m_n, int m_l, int m_ind, int mN, int mode);
+	 int writeLog(char *str, int logmode, int logtype);
+};
+
 
 enum SmartTermSTS
 {
@@ -63,10 +77,11 @@ class SmartDevice_stub
  public:
 	int type;  // тип-класс устройства: 1 SmartTerm, 2  App
     SmartTermSTS sts;   /* состо€ние */
-	int BiosCode;     /* код биоса */
-	int Vers;         /* верси€ */
-	int SubVers;      /* подверси€ */
-	int SubVers1;     /* верси€ подверсии */
+	int BiosCode;		/* код биоса */
+	int Vers;			/* верси€ */
+	int SubVers;		/* подверси€ */
+	int SubVers1;		/* верси€ подверсии */
+	int Revision;		/* revision */
 	char BiosDate[12];  /* дата компил€ции биоса */
 	int ClientId;     /* »дентификатор клиента */
 	int ClientId_k;   /* »дентификатор клиента key (todo future use)*/
@@ -86,7 +101,7 @@ class SmartDevice_stub
 		sts = STS_INIT;
 		mac[0] = mac[1] = mac[2] = mac[3] = mac[4] = mac[5] = 0;
 		BiosCode = 0;
-		Vers = SubVers = SubVers1 = 0;
+		Vers = SubVers = SubVers1 = Revision = 0;
 		BiosDate[0] = 0;
 		TCPserver_repot_period = 30; //600;
 		flag_need_to_set_rp = 0;
@@ -149,7 +164,13 @@ class SmartTerm:public SmartDevice_stub
 	SmartApp *pSmA;
 	Smart_OTlog OTlog;
 
+	Smart_log log;
+	int log_mode; //0 - не читать, 1 - писать в stdout, 2 - писать в файл
+	int log_type; //todo: 0 - минимальный
+
 	unsigned int ns;  // сколько раз передал информацию (дл€ расчета потребленной энергии)
+	unsigned short int bootsts[5];
+	char *logDirName;
 
 	SmartTerm(void)
 	{	st_type = 0; //st32 or undefined
@@ -171,11 +192,16 @@ class SmartTerm:public SmartDevice_stub
 		pSmA = NULL;
 		StartSts = 0;
 		reset_reason[0] = reset_reason[1] = 0;
+		bootsts[0] = bootsts[1] = bootsts[2] = bootsts[3] = bootsts[4] = 0;
+
 		InT = U0 = 0;
 		lOTlog = 0;
 		indOTlog = 0;
 		tOTlog = 0;
 		OTmemberCode = -1; //неизвестно
+		log_mode = 0; //0 - не читать, 1 - писать в stdout, 2 - писать в файл
+		log_type = 0; //todo: 0 - минимальный
+		logDirName = NULL;
 	}
 //    int	WriteSts(FILE *fp);
 //    int	ReadSts(FILE *fp);
@@ -187,9 +213,10 @@ class SmartTerm:public SmartDevice_stub
 //	int callback_Get_Sts(struct Msg1 *in, int inb); 
 	int callback_Send_Sts(struct Msg1 *in, int inb, struct Msg1 *out, int &outb); 
 	int callback_Send_OTlog(struct Msg1 *in, int inb, struct Msg1 *out, int &outb); 
+	int callback_Send_log(struct Msg1 *in, int inb, struct Msg1 *out, int &outb); 
 	int write(FILE *fp);
 	int AnalizeRecodrRead(char *name, char *par);
-	int Write_OT_log(void *p, int n);
+	void mklogDirName(void);
 };
 
 /* приложение */

@@ -26,63 +26,6 @@ OpenThermMessageType OpenTherm::getMessageType(unsigned long message)
 
 OpenTherm ot;
 
-int SmartTerm::Write_OT_log(void *_p, int n)
-{	int i, idd;
-	unsigned int *p, tmp, tms0, tms, tmsold, t8, count=0, ic, ic8, icold, ind;
-	unsigned long response;
-    uint16_t u88;
-	FILE *fp;
-
-	fp = fopen("OTlog.log", "a");
-	p = (unsigned int *) _p;
-    int parity, messagetype;
-	char str[256];
- 	 ind = indOTlog;
-	icold = ind&0xff;
-	ic8 = ind/256;
-	tms0 = tOTlog;
-	tmsold = tms0&0xffffff;
-	t8 = tms0/0x1000000;
-	for(i=0; i<n; i++)
-	{	
-		tmp = *((unsigned int *)p);
-		ic = (tmp>>24);
-		if(ic < icold)
-		{ ic8++;
-		}
-		icold = ic;
-		ind = ic8*256 + ic;
-
-		tms = tmp & 0xffffff;
-		if(tms < tmsold)
-		{ t8++;
-		}
-		tmsold = tms;
-		tms0 = t8*0x1000000 + tms;
-
-		p++;
-		response = *p;
-	    parity = ot.parity(response);
-	    messagetype = ot.getMessageType(response);
-		idd = (response >> 16 & 0xFF);
-	    u88 = (response & 0xffff);
-
-//	 	sprintf(str, "%x %d %d %s id %d %x",tmp, ind, tms0, OpenThermMessageTypeTxt[messagetype], idd, u88) ;
-	  	sprintf(str, "%d %d %s id %d %x", ind, tms0, OpenThermMessageTypeTxt[messagetype], idd, u88) ;
-
-		printf("%s\n", str);
-
-		fprintf(fp,"%s\n", str);
-		p++;
-	}
-
-	tOTlog = tms0;
-	indOTlog = ind;
-	fclose(fp);
-
-	return 0;
-}
-
 /************************************/
 int Smart_OTlog::InitLog(int nl)
 {
@@ -113,7 +56,7 @@ int Smart_OTlog::cmdLog(int nl)
 	if(nl > 0)
 	{	lOTlog = nl;
 		rc = nl;
-		if(rc > 15) rc = 15;
+		if(rc > 15) rc = 15; //todo
 		if(nbuf + rc >= OTlogMAX)
 			rc = OTlogMAX - nbuf;
 	} else if(nl == 0) {
@@ -149,7 +92,7 @@ int Smart_OTlog::Add_OT_log(void *_p, int n)
 
 void CreatePath_log(char *pathname, char *dirname, char *filename);
 
-int Smart_OTlog::writeLog(char *dirname)
+int Smart_OTlog::writeLog(char *dirname, char *_info)
 {	char filename[40], pathname[80];
 	char str[512], str0[312], str1[128];
 	FILE *fp;
@@ -157,7 +100,8 @@ int Smart_OTlog::writeLog(char *dirname)
     uint16_t u88;
 	unsigned char  lb, hb, sts;
 	char sb;
-	int i, idd, id_OT_ids;
+	int i, id_OT_ids, idd;
+//	OpenThermMessageID idd;
 	unsigned int *p, tmp, tms0,tms00, tms, tmsold, t8, count=0, ic, ic8, icold, ind;
 	unsigned long response;
     int parity, messagetype;
@@ -181,6 +125,9 @@ int Smart_OTlog::writeLog(char *dirname)
 		  newtime->tm_hour, newtime->tm_min, newtime->tm_sec);
 
 	fprintf(fp,";ot Log created: %s\n", str);
+	if(_info)
+	fprintf(fp,";%s\n", _info);
+		
 	p = (unsigned int *)pbuf;
 	ind = icold = 0;
 	ic8 = 0;
@@ -195,7 +142,6 @@ int Smart_OTlog::writeLog(char *dirname)
 		if(ic < icold)
 		{ ic8++;
 		}
- 		icold = ic;
 		ind = ic8*0x40 + ic;
 
 		tms = tmp & 0xffffff;
@@ -206,6 +152,11 @@ int Smart_OTlog::writeLog(char *dirname)
 		tms0 = t8*0x1000000 + tms;
 		if(i==0)
 			tms00 = tms0;
+		if((tms0 - tms00) > 10000000)
+				fprintf(fp,"==>\n");
+/*****/
+	 icold = ic;
+
 		p++;
 		response = *p;
 	    parity = ot.parity(response);
@@ -214,15 +165,18 @@ int Smart_OTlog::writeLog(char *dirname)
 	    u88 = (response & 0xffff);
 	    ft = (u88 & 0x8000) ? -(0x10000L - u88) / 256.0f : u88 / 256.0f;
 
-//	 	sprintf(str, "%x %d %d %s id %d %x",tmp, ind, tms0, OpenThermMessageTypeTxt[messagetype], idd, u88) ;
-	  	sprintf(str, "%d %3d %2d %s %d %04x ", ind, tms0 - tms00, idd, OpenThermMessageTypeTxt[messagetype], sts, u88) ;
+	    sprintf(str, "%d %3d %2d %s %d %04x ", ind, tms0 - tms00, idd, OpenThermMessageTypeTxt[messagetype], sts, u88) ;
+//	  	sprintf(str, "[%d %d] %d %3d %2d %s %d %04x ", ic, tms, ind, tms0 - tms00, idd, OpenThermMessageTypeTxt[messagetype], sts, u88) ;
+
+		if(parity) 
+			strcat(str, "Parity ");
 		tms00 = tms0;
 
 		id_OT_ids = ot.id_to_index[idd];
-		if(idd == OpenThermMessageID::Status)
+		if(idd == Status)
 		{	ot.verboseStatus(str0, u88);
 			strcat(str, str0);
-		} else if((idd == OpenThermMessageID::SConfigSMemberIDcode) && (messagetype == READ_ACK)) {
+		} else if((idd == SConfigSMemberIDcode) && (messagetype == READ_ACK)) {
 			ot.verboseSConfigSMemberIDcode(str0, u88);
 			memberCode = (u88 & 0x0ff);
 			strcat(str, str0);

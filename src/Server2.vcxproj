@@ -19,9 +19,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{ADEDD4F7-B7E9-403E-95A5-0EE195AAFF4C}</ProjectGuid>
+    <ProjectGuid>{BFBC8283-D1FA-49BD-AA34-8B4FC8253B28}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>Server2</RootNamespace>
+    <RootNamespace>Server22</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -141,13 +141,13 @@
     <ClInclude Include="AutoConfig.h" />
     <ClInclude Include="Connection.hpp" />
     <ClInclude Include="DeviceType.h" />
+    <ClInclude Include="OpenTherm.h" />
     <ClInclude Include="SmartDevice.h" />
     <ClInclude Include="SmartServer.hpp" />
     <ClInclude Include="Smart_commands.h" />
     <ClInclude Include="Smart_ServerConfig.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
-    <ClInclude Include="TCPconnection.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AutoConfig.cpp" />
@@ -156,6 +156,7 @@
     <ClCompile Include="SmartDevice.cpp" />
     <ClCompile Include="SmartServer.cpp" />
     <ClCompile Include="SmartServer2.cpp" />
+    <ClCompile Include="Smart_OT.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
