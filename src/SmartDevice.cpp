@@ -209,6 +209,23 @@ int SmartTerm::callback_Send_log(struct Msg1 *in, int inb, struct Msg1 *out, int
 	return rc;
 }
 
+void SmartTerm::WriteOTlog(void)
+{	char dirname[80];
+	char info[256];
+
+	sprintf(dirname,"st_%d", ClientId);
+	sprintf(info,"version=%d.%d.%d.%d %12s\n;reset reason: %d %d (%d %d %d %d %d)", 
+			Vers, SubVers, SubVers1,Revision, BiosDate, reset_reason[0],reset_reason[1],
+			bootsts[0],bootsts[1],bootsts[2],bootsts[3],bootsts[4]);
+      
+	OTlog.writeLog(dirname, info);
+	OTlog.FinishLog();
+	if(OTlog.memberCode >= 0 && OTmemberCode != OTlog.memberCode)
+	{	OTmemberCode = OTlog.memberCode;
+		parent->need_save_smt = 1;
+	}
+}
+
 //CCMD_SEND_STS_S answer
 int SmartTerm::callback_Send_Sts(struct Msg1 *in, int inb, struct Msg1 *out, int &outb)
 {	int rc = 0, tmp=0;
@@ -238,20 +255,7 @@ int SmartTerm::callback_Send_Sts(struct Msg1 *in, int inb, struct Msg1 *out, int
 	{
 		if(lOTlog & 0x8000)
 		{	if(OTlog.lOTlog > 0)
-			{	char dirname[80];
-				char info[256];
-
-				sprintf(dirname,"st_%d", ClientId);
-				sprintf(info,"version=%d.%d.%d.%d %12s\n;reset reason: %d %d (%d %d %d %d %d)", 
-						Vers, SubVers, SubVers1,Revision, BiosDate, reset_reason[0],reset_reason[1],
-						bootsts[0],bootsts[1],bootsts[2],bootsts[3],bootsts[4]);
-      
-				OTlog.writeLog(dirname, info);
-				OTlog.FinishLog();
-				if(OTlog.memberCode >= 0 && OTmemberCode != OTlog.memberCode)
-				{	OTmemberCode = OTlog.memberCode;
-					parent->need_save_smt = 1;
-				}
+			{	WriteOTlog();
 			}
 
 			lOTlog &= ~0x8000;
@@ -264,6 +268,17 @@ int SmartTerm::callback_Send_Sts(struct Msg1 *in, int inb, struct Msg1 *out, int
 			{	tmp = OTlog.cmdLog(lOTlog);
 				if(tmp > 0)
 					remote_cmd = 0x02;
+				else
+				{	if(OTlog.nbuf == 1024)
+					{	WriteOTlog();
+						if(OTlog.lOTlog == 0 && lOTlog > 0) OTlog.InitLog(lOTlog);
+						if(OTlog.lOTlog > 0)
+						{	tmp = OTlog.cmdLog(lOTlog);
+							if(tmp > 0)
+								remote_cmd = 0x02;
+						}
+					}
+				}
 			}
 		}
 	}
@@ -287,13 +302,16 @@ int SmartTerm::callback_Send_Sts(struct Msg1 *in, int inb, struct Msg1 *out, int
 //			if(tmp > 15) tmp = 15;
 			memcpy(&out->Buf[6], &tmp,4); //todo 
 			outb = 6+4*2+2;
+//printf("2 CCMD_SEND_OTLOG_S outb=%d tmp=%d\n", outb, tmp);
 			isCmd = 0;
 			rc = 1;
 			break;
 		
 		case 3: //CCMD_SEND_LOG_S
-			outb = 6+4+2;
+			outb = 6+4+2+4;
+			memcpy(&out->Buf[6], &log_mode,4); 
 			isCmd = 0;
+//printf("3 CCMD_SEND_OTLOG_S outb=%d log_mode=%d\n", outb, log_mode);
 			rc = 1;
 			break;
 

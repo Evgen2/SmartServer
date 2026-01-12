@@ -71,6 +71,7 @@ int Smart_OTlog::FinishLog(void)
 	if(pbuf)
 		free(pbuf);
 	pbuf = NULL;
+	nbuf = 0;
     lOTlog = 0;
 	return 0;
 }

@@ -217,6 +217,7 @@ class SmartTerm:public SmartDevice_stub
 	int write(FILE *fp);
 	int AnalizeRecodrRead(char *name, char *par);
 	void mklogDirName(void);
+	void WriteOTlog(void);
 };
 
 /* приложение */
